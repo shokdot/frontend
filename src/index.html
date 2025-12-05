@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>ft_transcendence | Welcome</title>
+	<meta name="description" content="The ultimate multiplayer Pong experience. Join and play now!" />
+	<link
+		href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Orbitron:wght@400;500;600;700;800;900&display=swap"
+		rel="stylesheet">
+
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
+
+		:root {
+			--bg: #0a0a0f;
+			--primary: #00ffff;
+			--secondary: #ff00ff;
+			--muted: #666680;
+			--text: #fafafa;
+		}
+
+		body {
+			min-height: 100vh;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			background: var(--bg);
+			font-family: 'Orbitron', sans-serif;
+			color: var(--text);
+			overflow: hidden;
+		}
+
+		/* Scanlines */
+		body::before {
+			content: '';
+			position: fixed;
+			inset: 0;
+			background: repeating-linear-gradient(0deg,
+					transparent,
+					transparent 2px,
+					rgba(255, 255, 255, 0.03) 2px,
+					rgba(255, 255, 255, 0.03) 4px);
+			pointer-events: none;
+			z-index: 100;
+		}
+
+		/* Grid background */
+		.grid-bg {
+			position: fixed;
+			inset: 0;
+			opacity: 0.1;
+			background-image:
+				linear-gradient(rgba(0, 255, 255, 0.3) 1px, transparent 1px),
+				linear-gradient(90deg, rgba(0, 255, 255, 0.3) 1px, transparent 1px);
+			background-size: 50px 50px;
+			pointer-events: none;
+		}
+
+		.container {
+			text-align: center;
+			padding: 1rem;
+			position: relative;
+			z-index: 10;
+		}
+
+		.subtitle {
+			font-size: clamp(0.6rem, 2vw, 0.875rem);
+			text-transform: uppercase;
+			letter-spacing: 0.5em;
+			color: var(--muted);
+			margin-bottom: 1rem;
+			font-family: monospace;
+		}
+
+		h1 {
+			font-family: 'Press Start 2P', cursive;
+			font-size: clamp(2rem, 10vw, 6rem);
+			text-transform: uppercase;
+			color: var(--primary);
+			letter-spacing: 0.1em;
+			animation: pulse-glow 2s ease-in-out infinite;
+		}
+
+		@keyframes pulse-glow {
+
+			0%,
+			100% {
+				text-shadow:
+					0 0 10px var(--primary),
+					0 0 20px var(--primary),
+					0 0 40px var(--primary);
+			}
+
+			50% {
+				text-shadow:
+					0 0 20px var(--primary),
+					0 0 40px var(--primary),
+					0 0 80px var(--primary),
+					0 0 120px var(--primary);
+			}
+		}
+
+		.tagline {
+			margin-top: 1.5rem;
+			font-size: clamp(0.7rem, 2.5vw, 1rem);
+			letter-spacing: 0.3em;
+			text-transform: uppercase;
+			color: var(--muted);
+		}
+
+		.buttons {
+			margin-top: 3rem;
+			display: flex;
+			flex-direction: column;
+			gap: 1rem;
+			align-items: center;
+		}
+
+		@media (min-width: 640px) {
+			.buttons {
+				flex-direction: row;
+				justify-content: center;
+				gap: 1.5rem;
+			}
+		}
+
+		.btn {
+			padding: 1rem 2rem;
+			font-family: 'Orbitron', sans-serif;
+			font-size: clamp(0.7rem, 2vw, 0.875rem);
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.2em;
+			cursor: pointer;
+			background: transparent;
+			transition: all 0.3s ease;
+		}
+
+		.btn-primary {
+			border: 2px solid var(--primary);
+			color: var(--primary);
+		}
+
+		.btn-primary:hover {
+			background: var(--primary);
+			color: var(--bg);
+			box-shadow:
+				0 0 20px var(--primary),
+				0 0 40px var(--primary),
+				inset 0 0 20px rgba(0, 255, 255, 0.3);
+		}
+
+		.btn-secondary {
+			border: 2px solid var(--secondary);
+			color: var(--secondary);
+		}
+
+		.btn-secondary:hover {
+			background: var(--secondary);
+			color: var(--bg);
+			box-shadow:
+				0 0 20px var(--secondary),
+				0 0 40px var(--secondary),
+				inset 0 0 20px rgba(255, 0, 255, 0.3);
+		}
+
+		/* Decorative line */
+		.decor {
+			margin-top: 4rem;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 1rem;
+		}
+
+		.decor-line {
+			height: 1px;
+			width: 60px;
+			background: linear-gradient(to right, transparent, var(--primary));
+		}
+
+		.decor-line:last-child {
+			background: linear-gradient(to left, transparent, var(--primary));
+		}
+
+		.decor-diamond {
+			width: 8px;
+			height: 8px;
+			background: var(--primary);
+			transform: rotate(45deg);
+			animation: flicker 3s ease-in-out infinite;
+		}
+
+		@keyframes flicker {
+
+			0%,
+			100% {
+				opacity: 1;
+			}
+
+			50% {
+				opacity: 0.6;
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<div class="grid-bg"></div>
+
+	<div class="container">
+		<p class="subtitle">ft_transcendence</p>
+
+		<h1>Welcome</h1>
+
+		<p class="tagline">The Ultimate Pong Experience</p>
+
+		<div class="buttons">
+			<button class="btn btn-primary" onclick="alert('Starting game...')">Start Game</button>
+			<button class="btn btn-secondary" onclick="alert('Joining room...')">Join Room</button>
+		</div>
+
+		<div class="decor">
+			<div class="decor-line"></div>
+			<div class="decor-diamond"></div>
+			<div class="decor-line"></div>
+		</div>
+	</div>
+</body>
+
+</html>
