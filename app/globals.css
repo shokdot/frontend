@@ -1,0 +1,151 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #8b5cf6;
+  --color-accent-light: #a78bfa;
+  --color-accent-dark: #7c3aed;
+  --color-neon-cyan: #00f0ff;
+  --color-neon-purple: #bf5af2;
+  --color-neon-pink: #e040fb;
+  --color-surface: #08080c;
+  --color-surface-light: #111118;
+  --color-surface-lighter: #1a1a24;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  background-color: var(--color-surface);
+  color: #e4e4e7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Neon text effects ── */
+
+.neon-text-cyan {
+  text-shadow:
+    0 0 7px rgba(0, 240, 255, 0.7),
+    0 0 20px rgba(0, 240, 255, 0.4),
+    0 0 40px rgba(0, 240, 255, 0.2);
+}
+
+.neon-text-purple {
+  text-shadow:
+    0 0 7px rgba(139, 92, 246, 0.7),
+    0 0 20px rgba(139, 92, 246, 0.4),
+    0 0 40px rgba(139, 92, 246, 0.2);
+}
+
+/* ── Neon box glows ── */
+
+.neon-box-cyan {
+  box-shadow:
+    0 0 10px rgba(0, 240, 255, 0.15),
+    0 0 30px rgba(0, 240, 255, 0.08),
+    inset 0 0 10px rgba(0, 240, 255, 0.05);
+}
+
+.neon-box-purple {
+  box-shadow:
+    0 0 10px rgba(139, 92, 246, 0.2),
+    0 0 30px rgba(139, 92, 246, 0.1),
+    inset 0 0 10px rgba(139, 92, 246, 0.05);
+}
+
+.neon-box-purple-strong {
+  box-shadow:
+    0 0 15px rgba(139, 92, 246, 0.4),
+    0 0 40px rgba(139, 92, 246, 0.2),
+    0 0 80px rgba(139, 92, 246, 0.1);
+}
+
+/* ── Animations ── */
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes neon-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(0, 240, 255, 0.3),
+      0 0 30px rgba(0, 240, 255, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(0, 240, 255, 0.6),
+      0 0 50px rgba(0, 240, 255, 0.3),
+      0 0 80px rgba(0, 240, 255, 0.15);
+  }
+}
+
+@keyframes neon-pulse-purple {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(139, 92, 246, 0.3),
+      0 0 30px rgba(139, 92, 246, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(139, 92, 246, 0.6),
+      0 0 50px rgba(139, 92, 246, 0.3),
+      0 0 80px rgba(139, 92, 246, 0.15);
+  }
+}
+
+@keyframes neon-flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    opacity: 1;
+  }
+  20%, 24%, 55% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes neon-border-rotate {
+  0% { --angle: 0deg; }
+  100% { --angle: 360deg; }
+}
+
+@keyframes ball-bounce {
+  0%   { left: 10%; top: 30%; }
+  25%  { left: 85%; top: 70%; }
+  50%  { left: 15%; top: 60%; }
+  75%  { left: 80%; top: 25%; }
+  100% { left: 10%; top: 30%; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-neon-pulse {
+  animation: neon-pulse 2.5s ease-in-out infinite;
+}
+
+.animate-neon-pulse-purple {
+  animation: neon-pulse-purple 2.5s ease-in-out infinite;
+}
+
+.animate-neon-flicker {
+  animation: neon-flicker 4s linear infinite;
+}
+
+.animate-ball {
+  animation: ball-bounce 6s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
