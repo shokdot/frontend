@@ -135,10 +135,10 @@ function StepCard({
 function StatItem({ value, label }: { value: string; label: string }) {
   return (
     <div className="text-center">
-      <div className="text-3xl font-bold text-neon-cyan neon-text-cyan sm:text-4xl">
+      <div className="text-2xl font-bold text-neon-cyan neon-text-cyan sm:text-4xl">
         {value}
       </div>
-      <div className="mt-1 text-sm text-zinc-400">{label}</div>
+      <div className="mt-1 text-xs text-zinc-400 sm:text-sm">{label}</div>
     </div>
   );
 }
@@ -147,7 +147,7 @@ function StatItem({ value, label }: { value: string; label: string }) {
 
 function PongVisual() {
   return (
-    <div className="relative mx-auto aspect-[4/3] w-full max-w-lg overflow-hidden rounded-2xl border border-neon-cyan/15 bg-surface-light neon-box-cyan">
+    <div className="relative mx-auto aspect-[4/3] w-full max-w-lg cursor-default select-none overflow-hidden rounded-2xl border border-neon-cyan/15 bg-surface-light neon-box-cyan">
       {/* Scanline overlay */}
       <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,240,255,0.015)_2px,rgba(0,240,255,0.015)_4px)]" />
 
@@ -186,10 +186,10 @@ export default function Home() {
       <Navbar />
 
       {/* ── Hero ── */}
-      <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pt-20 sm:px-6 lg:px-8">
+      <section className="relative flex min-h-[100dvh] flex-col items-center justify-center overflow-hidden px-4 pt-20 sm:px-6 lg:px-8">
         {/* Background glows */}
-        <div className="pointer-events-none absolute top-[-200px] left-1/2 h-[700px] w-[700px] -translate-x-1/2 rounded-full bg-accent/8 blur-[150px]" />
-        <div className="pointer-events-none absolute top-[100px] left-[20%] h-[400px] w-[400px] rounded-full bg-neon-cyan/5 blur-[120px]" />
+        <div className="pointer-events-none absolute top-[-200px] left-1/2 h-[min(700px,100vw)] w-[min(700px,100vw)] -translate-x-1/2 rounded-full bg-accent/8 blur-[150px]" />
+        <div className="pointer-events-none absolute top-[100px] left-[20%] h-[min(400px,80vw)] w-[min(400px,80vw)] rounded-full bg-neon-cyan/5 blur-[120px]" />
 
         {/* Grid overlay */}
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,240,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,240,255,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
@@ -234,8 +234,8 @@ export default function Home() {
           <PongVisual />
         </div>
 
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
+        {/* Scroll indicator — hidden on small screens to avoid overlapping the Pong visual */}
+        <div className="absolute bottom-8 left-1/2 hidden -translate-x-1/2 sm:block">
           <div className="flex h-8 w-5 items-start justify-center rounded-full border border-neon-cyan/25 p-1">
             <div className="h-2 w-1 animate-bounce rounded-full bg-neon-cyan/60" />
           </div>
@@ -243,8 +243,8 @@ export default function Home() {
       </section>
 
       {/* ── Features ── */}
-      <section id="features" className="relative py-24 sm:py-32">
-        <div className="pointer-events-none absolute right-0 top-0 h-[500px] w-[500px] rounded-full bg-accent/5 blur-[150px]" />
+      <section id="features" className="relative overflow-hidden py-24 sm:py-32">
+        <div className="pointer-events-none absolute right-0 top-0 h-[min(500px,100vw)] w-[min(500px,100vw)] rounded-full bg-accent/5 blur-[150px]" />
 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
@@ -300,8 +300,8 @@ export default function Home() {
       </section>
 
       {/* ── How It Works ── */}
-      <section id="how-it-works" className="relative py-24 sm:py-32">
-        <div className="pointer-events-none absolute left-0 bottom-0 h-[400px] w-[400px] rounded-full bg-neon-cyan/5 blur-[120px]" />
+      <section id="how-it-works" className="relative overflow-hidden py-24 sm:py-32">
+        <div className="pointer-events-none absolute left-0 bottom-0 h-[min(400px,80vw)] w-[min(400px,80vw)] rounded-full bg-neon-cyan/5 blur-[120px]" />
 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
@@ -361,7 +361,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="mt-12 grid grid-cols-2 gap-8 sm:grid-cols-4">
+              <div className="mt-12 grid grid-cols-2 gap-6 sm:gap-8 sm:grid-cols-4">
                 <StatItem value="7" label="Microservices" />
                 <StatItem value="6+" label="API Endpoints" />
                 <StatItem value="24/7" label="Monitoring" />
@@ -377,8 +377,8 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="relative overflow-hidden rounded-3xl border border-accent/20 bg-gradient-to-br from-surface-lighter via-accent/5 to-surface-lighter px-6 py-16 text-center neon-box-purple sm:px-12 sm:py-20">
             {/* Decorative neon orbs */}
-            <div className="pointer-events-none absolute -top-32 -right-32 h-72 w-72 rounded-full bg-accent/15 blur-[80px]" />
-            <div className="pointer-events-none absolute -bottom-32 -left-32 h-72 w-72 rounded-full bg-neon-cyan/10 blur-[80px]" />
+            <div className="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full bg-accent/15 blur-[80px] sm:-top-32 sm:-right-32 sm:h-72 sm:w-72" />
+            <div className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-neon-cyan/10 blur-[80px] sm:-bottom-32 sm:-left-32 sm:h-72 sm:w-72" />
 
             {/* Grid overlay */}
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.04)_1px,transparent_1px)] bg-[size:40px_40px]" />
