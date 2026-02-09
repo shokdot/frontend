@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import NotificationPanel from "../components/NotificationPanel";
+import { useTheme } from "../components/ThemeProvider";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
 function LogoIcon() {
   return (
     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent shadow-[0_0_15px_rgba(139,92,246,0.4)]">
-      <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+      <svg className="h-5 w-5 text-[#fff]" viewBox="0 0 24 24" fill="currentColor">
         <path d="M8 5v14l11-7z" />
       </svg>
     </div>
@@ -105,6 +106,73 @@ function CloseIcon({ className }: { className?: string }) {
   );
 }
 
+function SunIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="5" />
+      <line x1="12" y1="1" x2="12" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="23" />
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+      <line x1="1" y1="12" x2="3" y2="12" />
+      <line x1="21" y1="12" x2="23" y2="12" />
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+    </svg>
+  );
+}
+
+function MoonIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+    </svg>
+  );
+}
+
+function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <path d="M21 21l-4.35-4.35" />
+    </svg>
+  );
+}
+
+/* ──────────────────────── Search Data ──────────────────────── */
+
+interface SearchPlayer {
+  username: string;
+  avatar: string;
+  elo: number;
+  status: "online" | "in-game" | "idle" | "offline";
+}
+
+const allPlayers: SearchPlayer[] = [
+  { username: "NeonBlade42", avatar: "NB", elo: 2450, status: "online" },
+  { username: "QuantumServe", avatar: "QS", elo: 2380, status: "offline" },
+  { username: "CyberPaddle", avatar: "CP", elo: 2310, status: "online" },
+  { username: "ShadowSmash", avatar: "SS", elo: 2240, status: "in-game" },
+  { username: "VoltServe", avatar: "VS", elo: 2180, status: "idle" },
+  { username: "BlitzPong", avatar: "BP", elo: 2120, status: "offline" },
+  { username: "NeonDrift", avatar: "ND", elo: 2050, status: "online" },
+  { username: "PixelStorm", avatar: "PS", elo: 1980, status: "in-game" },
+  { username: "ArcadeKing", avatar: "AK", elo: 1920, status: "online" },
+  { username: "RetroWave", avatar: "RW", elo: 1870, status: "online" },
+  { username: "GlitchMaster", avatar: "GM", elo: 1810, status: "offline" },
+  { username: "PulsePlayer", avatar: "PP", elo: 1770, status: "idle" },
+  { username: "HyperRally", avatar: "HR", elo: 1720, status: "online" },
+  { username: "TurboSpin", avatar: "TS", elo: 1680, status: "offline" },
+  { username: "CosmicAce", avatar: "CA", elo: 1640, status: "online" },
+];
+
+const statusDot: Record<string, string> = {
+  online: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
+  "in-game": "bg-neon-cyan shadow-[0_0_6px_rgba(0,240,255,0.8)]",
+  idle: "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]",
+  offline: "bg-zinc-600",
+};
+
 /* ──────────────────────── Nav Items ──────────────────────── */
 
 const navItems = [
@@ -124,20 +192,47 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
-  // Close sidebar on route change
+  const searchResults = searchQuery.trim()
+    ? allPlayers.filter((p) =>
+        p.username.toLowerCase().includes(searchQuery.toLowerCase()),
+      ).slice(0, 6)
+    : [];
+
+  // Close sidebar + search on route change
   useEffect(() => {
     setSidebarOpen(false);
+    setSearchOpen(false);
+    setSearchQuery("");
   }, [pathname]);
 
-  // Close sidebar on escape key
+  // Close sidebar on escape key, close search
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setSidebarOpen(false);
+      if (e.key === "Escape") {
+        setSidebarOpen(false);
+        setSearchOpen(false);
+      }
     }
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
+  }, []);
+
+  // Close search dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
   async function handleLogout() {
@@ -223,7 +318,7 @@ export default function DashboardLayout({
       {/* ── Main area ── */}
       <div className="flex flex-1 flex-col">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/5 bg-surface/80 px-4 backdrop-blur-xl sm:px-6">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-white/5 bg-surface/80 px-4 backdrop-blur-xl sm:px-6">
           {/* Left: hamburger + breadcrumb */}
           <div className="flex items-center gap-3">
             <button
@@ -232,15 +327,80 @@ export default function DashboardLayout({
             >
               <MenuIcon className="h-5 w-5" />
             </button>
-            <h2 className="text-sm font-semibold text-white capitalize">
+            <h2 className="hidden text-sm font-semibold text-white capitalize sm:block">
               {pathname === "/dashboard"
                 ? "Dashboard"
                 : pathname.split("/").pop()?.replace(/-/g, " ") || "Dashboard"}
             </h2>
           </div>
 
-          {/* Right: notifications + avatar */}
+          {/* Center: search bar */}
+          <div ref={searchRef} className="relative flex-1 max-w-md mx-auto">
+            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              placeholder="Search players..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSearchOpen(true);
+              }}
+              onFocus={() => setSearchOpen(true)}
+              className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2 pl-10 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+            />
+
+            {/* Search dropdown */}
+            {searchOpen && searchQuery.trim() && (
+              <div className="absolute top-full left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-xl border border-white/5 bg-surface-light shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
+                {searchResults.length > 0 ? (
+                  <div className="py-1">
+                    {searchResults.map((player) => (
+                      <button
+                        key={player.username}
+                        onClick={() => {
+                          router.push(`/dashboard/player/${player.username}`);
+                          setSearchOpen(false);
+                          setSearchQuery("");
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-xs font-bold text-zinc-400">
+                            {player.avatar}
+                          </div>
+                          <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface-light ${statusDot[player.status]}`} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-zinc-200">
+                            {player.username}
+                          </p>
+                          <p className="text-xs text-zinc-500">{player.elo} ELO</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 py-6 text-center">
+                    <p className="text-sm text-zinc-500">No players found</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right: theme toggle + notifications + avatar */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? (
+                <SunIcon className="h-4.5 w-4.5" />
+              ) : (
+                <MoonIcon className="h-4.5 w-4.5" />
+              )}
+            </button>
             <NotificationPanel />
             <div className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-accent/20 text-sm font-bold text-accent-light ring-2 ring-accent/30">
               U

@@ -23,52 +23,6 @@ function CameraIcon({ className }: { className?: string }) {
   );
 }
 
-function TrophyIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9H4.5a2.5 2.5 0 010-5H6" />
-      <path d="M18 9h1.5a2.5 2.5 0 000-5H18" />
-      <path d="M4 22h16" />
-      <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-      <path d="M18 2H6v7a6 6 0 0012 0V2z" />
-    </svg>
-  );
-}
-
-function SwordsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" />
-      <line x1="13" y1="19" x2="19" y2="13" />
-      <line x1="16" y1="16" x2="20" y2="20" />
-      <line x1="19" y1="21" x2="21" y2="19" />
-      <polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" />
-      <line x1="5" y1="14" x2="9" y2="18" />
-      <line x1="7" y1="17" x2="4" y2="20" />
-      <line x1="3" y1="19" x2="5" y2="21" />
-    </svg>
-  );
-}
-
-function TargetIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <circle cx="12" cy="12" r="6" />
-      <circle cx="12" cy="12" r="2" />
-    </svg>
-  );
-}
-
-function FlameIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z" />
-    </svg>
-  );
-}
-
 function CalendarIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
@@ -94,22 +48,6 @@ function GlobeIcon({ className }: { className?: string }) {
       <circle cx="12" cy="12" r="10" />
       <line x1="2" y1="12" x2="22" y2="12" />
       <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
-    </svg>
-  );
-}
-
-function StarIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
     </svg>
   );
 }
@@ -159,25 +97,6 @@ const profileData = {
   },
 };
 
-interface Achievement {
-  id: number;
-  name: string;
-  description: string;
-  icon: "trophy" | "flame" | "target" | "star" | "chart" | "swords";
-  unlocked: boolean;
-  date?: string;
-  glowColor: "cyan" | "purple" | "pink" | "amber";
-}
-
-const achievements: Achievement[] = [
-  { id: 1, name: "First Victory", description: "Win your first match", icon: "trophy", unlocked: true, date: "Jan 15, 2026", glowColor: "cyan" },
-  { id: 2, name: "On Fire", description: "Win 5 matches in a row", icon: "flame", unlocked: true, date: "Jan 22, 2026", glowColor: "pink" },
-  { id: 3, name: "Sharpshooter", description: "Win a match 11-0", icon: "target", unlocked: true, date: "Feb 1, 2026", glowColor: "purple" },
-  { id: 4, name: "Rising Star", description: "Reach top 10 on the leaderboard", icon: "star", unlocked: true, date: "Feb 5, 2026", glowColor: "amber" },
-  { id: 5, name: "Century", description: "Play 100 matches", icon: "swords", unlocked: true, date: "Feb 8, 2026", glowColor: "cyan" },
-  { id: 6, name: "Statistician", description: "Maintain a 70% win rate over 50 games", icon: "chart", unlocked: false, glowColor: "purple" },
-];
-
 interface MatchData {
   id: number;
   opponent: string;
@@ -197,77 +116,6 @@ const matchHistory: MatchData[] = [
   { id: 7, opponent: "ArcadeKing", result: "win", score: "11 - 8", date: "3 days ago", eloChange: +20 },
   { id: 8, opponent: "GlitchMaster", result: "loss", score: "7 - 11", date: "3 days ago", eloChange: -12 },
 ];
-
-/* ──────────────────────── Achievement Card ──────────────────────── */
-
-const achievementIconMap = {
-  trophy: TrophyIcon,
-  flame: FlameIcon,
-  target: TargetIcon,
-  star: StarIcon,
-  chart: ChartIcon,
-  swords: SwordsIcon,
-};
-
-const achievementGlowMap = {
-  cyan: {
-    iconBg: "bg-neon-cyan/15 text-neon-cyan",
-    border: "border-neon-cyan/20",
-    glow: "shadow-[0_0_20px_rgba(0,240,255,0.08)]",
-  },
-  purple: {
-    iconBg: "bg-accent/15 text-accent-light",
-    border: "border-accent/20",
-    glow: "shadow-[0_0_20px_rgba(139,92,246,0.08)]",
-  },
-  pink: {
-    iconBg: "bg-neon-pink/15 text-neon-pink",
-    border: "border-neon-pink/20",
-    glow: "shadow-[0_0_20px_rgba(224,64,251,0.08)]",
-  },
-  amber: {
-    iconBg: "bg-amber-500/15 text-amber-400",
-    border: "border-amber-500/20",
-    glow: "shadow-[0_0_20px_rgba(245,158,11,0.08)]",
-  },
-};
-
-function AchievementCard({ achievement }: { achievement: Achievement }) {
-  const Icon = achievementIconMap[achievement.icon];
-  const colors = achievementGlowMap[achievement.glowColor];
-
-  return (
-    <div
-      className={`group relative rounded-xl border p-4 transition-all duration-300 ${
-        achievement.unlocked
-          ? `${colors.border} bg-surface-lighter/50 hover:bg-surface-lighter ${colors.glow}`
-          : "border-white/5 bg-surface-lighter/30 opacity-50"
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <div
-          className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg ${
-            achievement.unlocked ? colors.iconBg : "bg-white/5 text-zinc-600"
-          }`}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className={`text-sm font-semibold ${achievement.unlocked ? "text-white" : "text-zinc-500"}`}>
-            {achievement.name}
-          </p>
-          <p className="mt-0.5 text-xs text-zinc-500">{achievement.description}</p>
-          {achievement.unlocked && achievement.date && (
-            <p className="mt-1 text-xs text-zinc-600">{achievement.date}</p>
-          )}
-        </div>
-        {achievement.unlocked && (
-          <CheckIcon className="h-4 w-4 flex-shrink-0 text-emerald-400" />
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ──────────────────────── Edit Profile Modal ──────────────────────── */
 
@@ -392,7 +240,6 @@ function EditProfileModal({
 
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<"matches" | "achievements">("matches");
 
   const { stats } = profileData;
 
@@ -503,113 +350,79 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* ── Tabs ── */}
-        <div className="mt-6">
-          <div className="flex gap-1 rounded-xl border border-white/5 bg-surface-light p-1">
-            <button
-              onClick={() => setActiveTab("matches")}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-                activeTab === "matches"
-                  ? "bg-accent/10 text-accent-light shadow-[inset_0_0_20px_rgba(139,92,246,0.05)]"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Match History
-            </button>
-            <button
-              onClick={() => setActiveTab("achievements")}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-                activeTab === "achievements"
-                  ? "bg-accent/10 text-accent-light shadow-[inset_0_0_20px_rgba(139,92,246,0.05)]"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Achievements ({achievements.filter((a) => a.unlocked).length}/{achievements.length})
-            </button>
+        {/* ── Match History ── */}
+        <div className="mt-6 rounded-2xl border border-white/5 bg-surface-light p-5 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold text-white">Match History</h2>
+
+          {/* Table header (desktop) */}
+          <div className="mb-3 hidden grid-cols-[1fr_auto_auto_auto] gap-4 px-4 text-xs font-medium uppercase tracking-wider text-zinc-500 sm:grid">
+            <span>Opponent</span>
+            <span className="w-20 text-center">Score</span>
+            <span className="w-20 text-center">ELO</span>
+            <span className="w-24 text-right">Date</span>
           </div>
-        </div>
 
-        {/* ── Tab content ── */}
-        <div className="mt-4">
-          {activeTab === "matches" ? (
-            <div className="rounded-2xl border border-white/5 bg-surface-light p-5 sm:p-6">
-              {/* Table header (desktop) */}
-              <div className="mb-3 hidden grid-cols-[1fr_auto_auto_auto] gap-4 px-4 text-xs font-medium uppercase tracking-wider text-zinc-500 sm:grid">
-                <span>Opponent</span>
-                <span className="w-20 text-center">Score</span>
-                <span className="w-20 text-center">ELO</span>
-                <span className="w-24 text-right">Date</span>
-              </div>
-
-              <div className="space-y-2">
-                {matchHistory.map((match) => {
-                  const isWin = match.result === "win";
-                  return (
-                    <div
-                      key={match.id}
-                      className="flex items-center gap-4 rounded-xl border border-white/5 bg-surface-lighter/50 px-4 py-3 transition-all hover:border-white/10 hover:bg-surface-lighter"
-                    >
-                      {/* Result indicator */}
-                      <div
-                        className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                          isWin ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                        }`}
-                      >
-                        {isWin ? "W" : "L"}
-                      </div>
-
-                      {/* Opponent */}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-white">
-                          vs {match.opponent}
-                        </p>
-                        <p className="text-xs text-zinc-500 sm:hidden">{match.date}</p>
-                      </div>
-
-                      {/* Score */}
-                      <span
-                        className={`text-sm font-semibold ${
-                          isWin ? "text-emerald-400" : "text-red-400"
-                        }`}
-                      >
-                        {match.score}
-                      </span>
-
-                      {/* ELO change */}
-                      <span
-                        className={`hidden w-20 text-center text-sm font-medium sm:block ${
-                          match.eloChange > 0 ? "text-emerald-400" : "text-red-400"
-                        }`}
-                      >
-                        {match.eloChange > 0 ? "+" : ""}
-                        {match.eloChange}
-                      </span>
-
-                      {/* Date (desktop) */}
-                      <span className="hidden w-24 text-right text-xs text-zinc-500 sm:block">
-                        {match.date}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-4 text-center">
-                <Link
-                  href="/dashboard/history"
-                  className="text-xs font-medium text-zinc-500 transition-colors hover:text-neon-cyan"
+          <div className="space-y-2">
+            {matchHistory.map((match) => {
+              const isWin = match.result === "win";
+              return (
+                <div
+                  key={match.id}
+                  className="flex items-center gap-4 rounded-xl border border-white/5 bg-surface-lighter/50 px-4 py-3 transition-all hover:border-white/10 hover:bg-surface-lighter"
                 >
-                  View full match history
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {achievements.map((achievement) => (
-                <AchievementCard key={achievement.id} achievement={achievement} />
-              ))}
-            </div>
-          )}
+                  {/* Result indicator */}
+                  <div
+                    className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                      isWin ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
+                    }`}
+                  >
+                    {isWin ? "W" : "L"}
+                  </div>
+
+                  {/* Opponent */}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">
+                      vs {match.opponent}
+                    </p>
+                    <p className="text-xs text-zinc-500 sm:hidden">{match.date}</p>
+                  </div>
+
+                  {/* Score */}
+                  <span
+                    className={`text-sm font-semibold ${
+                      isWin ? "text-emerald-400" : "text-red-400"
+                    }`}
+                  >
+                    {match.score}
+                  </span>
+
+                  {/* ELO change */}
+                  <span
+                    className={`hidden w-20 text-center text-sm font-medium sm:block ${
+                      match.eloChange > 0 ? "text-emerald-400" : "text-red-400"
+                    }`}
+                  >
+                    {match.eloChange > 0 ? "+" : ""}
+                    {match.eloChange}
+                  </span>
+
+                  {/* Date (desktop) */}
+                  <span className="hidden w-24 text-right text-xs text-zinc-500 sm:block">
+                    {match.date}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 text-center">
+            <Link
+              href="/dashboard/history"
+              className="text-xs font-medium text-zinc-500 transition-colors hover:text-neon-cyan"
+            >
+              View full match history
+            </Link>
+          </div>
         </div>
       </div>
 
