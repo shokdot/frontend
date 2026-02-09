@@ -28,7 +28,7 @@ export default function LoginPage() {
         throw new Error(data?.message || "Invalid email or password");
       }
 
-      window.location.href = "/";
+      window.location.href = "/dashboard";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
