@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -614,6 +615,7 @@ function PongPreview() {
 /* ──────────────────────── Page ──────────────────────── */
 
 export default function PlayPage() {
+  const router = useRouter();
   const [selectedMode, setSelectedMode] = useState<string>("ai");
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>("medium");
   const [isSearching, setIsSearching] = useState(false);
@@ -622,10 +624,14 @@ export default function PlayPage() {
   const c = colorMap[activeMode.color];
 
   function handleStart() {
+    if (selectedMode === "local") {
+      router.push("/dashboard/play/local");
+      return;
+    }
     if (selectedMode === "online") {
       setIsSearching(true);
     }
-    // TODO: wire to game engine / API
+    // TODO: wire other modes to game engine / API
   }
 
   return (
