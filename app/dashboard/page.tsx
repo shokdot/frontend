@@ -598,9 +598,13 @@ export default function DashboardPage() {
 						<div>
 							<h1 className="text-2xl font-bold text-white sm:text-3xl">
 								Welcome back,{" "}
-								<span className="text-accent neon-text-purple">
-									{displayName}
-								</span>
+								{profile ? (
+									<span className="text-accent neon-text-purple">
+										{displayName}
+									</span>
+								) : (
+									<span className="inline-block h-8 w-36 animate-pulse rounded-md bg-accent/20 align-middle" />
+								)}
 							</h1>
 							<p className="mt-1 text-sm text-zinc-400">
 								Ready for your next match?
