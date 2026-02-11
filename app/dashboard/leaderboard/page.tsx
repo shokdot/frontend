@@ -1,6 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
+import {
+  getLeaderboard,
+  getPlayerRank,
+  getMyProfile,
+  getUserById,
+  type ApiLeaderboardEntry,
+  type ApiUserProfile,
+} from "@/lib/api";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -50,10 +59,11 @@ function ChevronDownIcon({ className }: { className?: string }) {
   );
 }
 
-function MinusIcon({ className }: { className?: string }) {
+function SpinnerIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <line x1="5" y1="12" x2="19" y2="12" />
+    <svg className={className} viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
     </svg>
   );
 }
@@ -62,43 +72,20 @@ function MinusIcon({ className }: { className?: string }) {
 
 type SortField = "rank" | "elo" | "wins" | "winRate";
 type SortDirection = "asc" | "desc";
-type TrendDirection = "up" | "down" | "stable";
 
 interface LeaderboardPlayer {
   rank: number;
-  name: string;
+  userId: string;
+  username: string;
   avatar: string;
+  avatarUrl: string | null;
   wins: number;
   losses: number;
+  draws: number;
   elo: number;
-  trend: TrendDirection;
-  isCurrentUser?: boolean;
+  level: number;
+  isCurrentUser: boolean;
 }
-
-/* ──────────────────────── Mock Data ──────────────────────── */
-
-const leaderboardData: LeaderboardPlayer[] = [
-  { rank: 1, name: "NeonBlade42", avatar: "NB", wins: 142, losses: 28, elo: 2450, trend: "up" },
-  { rank: 2, name: "QuantumServe", avatar: "QS", wins: 128, losses: 35, elo: 2380, trend: "up" },
-  { rank: 3, name: "CyberPaddle", avatar: "CP", wins: 115, losses: 40, elo: 2310, trend: "down" },
-  { rank: 4, name: "ShadowSmash", avatar: "SS", wins: 108, losses: 42, elo: 2240, trend: "up" },
-  { rank: 5, name: "VoltServe", avatar: "VS", wins: 102, losses: 48, elo: 2180, trend: "stable" },
-  { rank: 6, name: "BlitzPong", avatar: "BP", wins: 98, losses: 52, elo: 2120, trend: "down" },
-  { rank: 7, name: "NeonDrift", avatar: "ND", wins: 94, losses: 50, elo: 2050, trend: "up" },
-  { rank: 8, name: "PixelStorm", avatar: "PS", wins: 91, losses: 55, elo: 1980, trend: "stable" },
-  { rank: 9, name: "ArcadeKing", avatar: "AK", wins: 89, losses: 57, elo: 1920, trend: "up" },
-  { rank: 10, name: "RetroWave", avatar: "RW", wins: 85, losses: 60, elo: 1870, trend: "down" },
-  { rank: 11, name: "You", avatar: "U", wins: 87, losses: 47, elo: 1850, trend: "up", isCurrentUser: true },
-  { rank: 12, name: "GlitchMaster", avatar: "GM", wins: 80, losses: 62, elo: 1810, trend: "stable" },
-  { rank: 13, name: "PulsePlayer", avatar: "PP", wins: 77, losses: 58, elo: 1770, trend: "down" },
-  { rank: 14, name: "HyperRally", avatar: "HR", wins: 74, losses: 63, elo: 1720, trend: "up" },
-  { rank: 15, name: "TurboSpin", avatar: "TS", wins: 70, losses: 65, elo: 1680, trend: "stable" },
-  { rank: 16, name: "CosmicAce", avatar: "CA", wins: 68, losses: 68, elo: 1640, trend: "down" },
-  { rank: 17, name: "VortexPlayer", avatar: "VP", wins: 65, losses: 70, elo: 1600, trend: "up" },
-  { rank: 18, name: "ZenPaddle", avatar: "ZP", wins: 60, losses: 72, elo: 1550, trend: "stable" },
-  { rank: 19, name: "NovaBounce", avatar: "NV", wins: 55, losses: 75, elo: 1500, trend: "down" },
-  { rank: 20, name: "EchoStrike", avatar: "ES", wins: 50, losses: 78, elo: 1450, trend: "stable" },
-];
 
 /* ──────────────────────── Podium Card ──────────────────────── */
 
@@ -145,7 +132,10 @@ function PodiumCard({
   const c = config[place];
 
   return (
-    <div className={`flex flex-col items-center ${place === 1 ? "order-2" : place === 2 ? "order-1" : "order-3"}`}>
+    <Link
+      href={player.isCurrentUser ? "/dashboard/profile" : `/dashboard/player/${player.username}`}
+      className={`flex flex-col items-center ${place === 1 ? "order-2" : place === 2 ? "order-1" : "order-3"} transition-transform hover:scale-105`}
+    >
       {/* Crown for #1 */}
       {place === 1 && (
         <CrownIcon className="mb-1 h-6 w-6 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.8)]" />
@@ -153,11 +143,19 @@ function PodiumCard({
 
       {/* Avatar */}
       <div className="relative">
-        <div
-          className={`flex items-center justify-center rounded-full ${c.avatarSize} ${c.bgColor} font-bold ${c.textColor} ring-2 ${c.ringColor}`}
-        >
-          {player.avatar}
-        </div>
+        {player.avatarUrl ? (
+          <img
+            src={player.avatarUrl}
+            alt={player.username}
+            className={`rounded-full object-cover ${c.avatarSize} ring-2 ${c.ringColor}`}
+          />
+        ) : (
+          <div
+            className={`flex items-center justify-center rounded-full ${c.avatarSize} ${c.bgColor} font-bold ${c.textColor} ring-2 ${c.ringColor}`}
+          >
+            {player.avatar}
+          </div>
+        )}
         <div
           className={`absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full ${c.bgColor} text-[10px] font-bold ${c.textColor} ring-1 ${c.ringColor} ${c.badgeGlow}`}
         >
@@ -167,7 +165,7 @@ function PodiumCard({
 
       {/* Name */}
       <p className={`mt-2 text-sm font-semibold ${c.textColor}`}>
-        {player.name}
+        {player.username}
       </p>
       <p className="text-xs text-zinc-500">{player.elo} ELO</p>
 
@@ -177,31 +175,7 @@ function PodiumCard({
       >
         <span className={`text-lg font-bold ${c.textColor}`}>{c.label}</span>
       </div>
-    </div>
-  );
-}
-
-/* ──────────────────────── Trend Indicator ──────────────────────── */
-
-function TrendIndicator({ trend }: { trend: TrendDirection }) {
-  if (trend === "up") {
-    return (
-      <span className="inline-flex items-center gap-0.5 text-emerald-400">
-        <ChevronUpIcon className="h-3.5 w-3.5" />
-      </span>
-    );
-  }
-  if (trend === "down") {
-    return (
-      <span className="inline-flex items-center gap-0.5 text-red-400">
-        <ChevronDownIcon className="h-3.5 w-3.5" />
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center text-zinc-500">
-      <MinusIcon className="h-3.5 w-3.5" />
-    </span>
+    </Link>
   );
 }
 
@@ -272,14 +246,152 @@ function SortHeader({
   );
 }
 
+/* ──────────────────────── Skeleton Loaders ──────────────────────── */
+
+function PodiumSkeleton() {
+  return (
+    <div className="flex items-end justify-center gap-2 sm:gap-4">
+      {[2, 1, 3].map((place) => (
+        <div
+          key={place}
+          className={`flex flex-col items-center ${place === 1 ? "order-2" : place === 2 ? "order-1" : "order-3"}`}
+        >
+          <div className={`${place === 1 ? "h-16 w-16" : place === 2 ? "h-14 w-14" : "h-12 w-12"} animate-pulse rounded-full bg-surface-lighter`} />
+          <div className="mt-2 h-4 w-16 animate-pulse rounded bg-surface-lighter" />
+          <div className="mt-1 h-3 w-12 animate-pulse rounded bg-surface-lighter" />
+          <div className={`mt-3 w-24 animate-pulse rounded-t-xl bg-surface-lighter sm:w-28 ${place === 1 ? "h-36" : place === 2 ? "h-28" : "h-24"}`} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TableRowSkeleton() {
+  return (
+    <div className="flex items-center gap-3 px-3 py-3">
+      <div className="h-7 w-7 animate-pulse rounded-lg bg-surface-lighter" />
+      <div className="h-7 w-7 animate-pulse rounded-full bg-surface-lighter" />
+      <div className="flex-1">
+        <div className="h-4 w-24 animate-pulse rounded bg-surface-lighter" />
+      </div>
+      <div className="hidden sm:block">
+        <div className="h-4 w-12 animate-pulse rounded bg-surface-lighter" />
+      </div>
+      <div className="hidden sm:block">
+        <div className="h-4 w-10 animate-pulse rounded bg-surface-lighter" />
+      </div>
+      <div className="hidden sm:block">
+        <div className="h-4 w-10 animate-pulse rounded bg-surface-lighter" />
+      </div>
+      <div className="hidden sm:block">
+        <div className="h-4 w-14 animate-pulse rounded bg-surface-lighter" />
+      </div>
+    </div>
+  );
+}
+
 /* ──────────────────────── Page ──────────────────────── */
 
 export default function LeaderboardPage() {
+  const [players, setPlayers] = useState<LeaderboardPlayer[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [myRank, setMyRank] = useState<number | null>(null);
+  const [myElo, setMyElo] = useState<number | null>(null);
+  const [totalPlayers, setTotalPlayers] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<SortField>("rank");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
-  const currentUser = leaderboardData.find((p) => p.isCurrentUser);
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch profile and leaderboard in parallel
+      const [profileRes, leaderboardRes] = await Promise.allSettled([
+        getMyProfile(),
+        getLeaderboard(100, 0),
+      ]);
+
+      let userId: string | null = null;
+      if (profileRes.status === "fulfilled") {
+        userId = profileRes.value.data.userId;
+        setCurrentUserId(userId);
+      }
+
+      if (leaderboardRes.status === "rejected") {
+        setError("Failed to load leaderboard data");
+        return;
+      }
+
+      const entries = leaderboardRes.value.data;
+      setTotalPlayers(leaderboardRes.value.count);
+
+      // Resolve usernames in parallel
+      const userCache = new Map<string, ApiUserProfile>();
+      await Promise.allSettled(
+        entries.map(async (entry) => {
+          try {
+            const res = await getUserById(entry.userId);
+            userCache.set(entry.userId, res.data);
+          } catch {
+            // Will use fallback below
+          }
+        }),
+      );
+
+      const resolved: LeaderboardPlayer[] = entries.map((entry) => {
+        const profile = userCache.get(entry.userId);
+        const username = profile?.displayName || profile?.username || "Unknown";
+        return {
+          rank: entry.rank,
+          userId: entry.userId,
+          username,
+          avatar: username.slice(0, 2).toUpperCase(),
+          avatarUrl: profile?.avatarUrl ?? null,
+          wins: entry.wins,
+          losses: entry.losses,
+          draws: entry.draws,
+          elo: entry.elo,
+          level: entry.level,
+          isCurrentUser: entry.userId === userId,
+        };
+      });
+
+      setPlayers(resolved);
+
+      // Fetch current user's rank
+      if (userId) {
+        try {
+          const rankRes = await getPlayerRank(userId);
+          setMyRank(rankRes.data.rank);
+          setMyElo(rankRes.data.elo);
+        } catch {
+          // Non-critical — rank badge just won't show
+        }
+      }
+    } catch {
+      setError("Failed to load leaderboard");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
+
+  const currentUser = useMemo(
+    () => players.find((p) => p.isCurrentUser),
+    [players],
+  );
+
+  // Use API rank data if available, else fall back to leaderboard position
+  const displayRank = myRank ?? currentUser?.rank;
+  const displayElo = myElo ?? currentUser?.elo;
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -291,11 +403,11 @@ export default function LeaderboardPage() {
   }
 
   const filteredAndSorted = useMemo(() => {
-    let data = [...leaderboardData];
+    let data = [...players];
 
     if (search.trim()) {
       const q = search.toLowerCase();
-      data = data.filter((p) => p.name.toLowerCase().includes(q));
+      data = data.filter((p) => p.username.toLowerCase().includes(q));
     }
 
     data.sort((a, b) => {
@@ -313,18 +425,29 @@ export default function LeaderboardPage() {
           aVal = a.wins;
           bVal = b.wins;
           break;
-        case "winRate":
-          aVal = a.wins / (a.wins + a.losses);
-          bVal = b.wins / (b.wins + b.losses);
+        case "winRate": {
+          const aTotal = a.wins + a.losses + a.draws;
+          const bTotal = b.wins + b.losses + b.draws;
+          aVal = aTotal > 0 ? a.wins / aTotal : 0;
+          bVal = bTotal > 0 ? b.wins / bTotal : 0;
           break;
+        }
       }
       return sortDirection === "asc" ? aVal - bVal : bVal - aVal;
     });
 
     return data;
-  }, [search, sortField, sortDirection]);
+  }, [players, search, sortField, sortDirection]);
 
-  const topThree = leaderboardData.slice(0, 3);
+  const topThree = players.slice(0, 3);
+
+  const currentUserWins = currentUser?.wins ?? 0;
+  const currentUserLosses = currentUser?.losses ?? 0;
+  const currentUserDraws = currentUser?.draws ?? 0;
+  const currentUserTotal = currentUserWins + currentUserLosses + currentUserDraws;
+  const currentUserWinRate = currentUserTotal > 0
+    ? ((currentUserWins / currentUserTotal) * 100).toFixed(1)
+    : "0.0";
 
   return (
     <div className="relative">
@@ -355,30 +478,36 @@ export default function LeaderboardPage() {
             </div>
 
             {/* Your rank summary */}
-            {currentUser && (
+            {!loading && currentUserId && (
               <div className="mt-5 flex flex-wrap gap-3">
-                <div className="rounded-xl border border-accent/15 bg-accent/5 px-4 py-2.5">
-                  <p className="text-xs text-zinc-500">Your Rank</p>
-                  <p className="text-lg font-bold text-accent-light">
-                    #{currentUser.rank}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-neon-cyan/15 bg-neon-cyan/5 px-4 py-2.5">
-                  <p className="text-xs text-zinc-500">Your ELO</p>
-                  <p className="text-lg font-bold text-neon-cyan">
-                    {currentUser.elo}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-2.5">
-                  <p className="text-xs text-zinc-500">Win Rate</p>
-                  <p className="text-lg font-bold text-emerald-400">
-                    {((currentUser.wins / (currentUser.wins + currentUser.losses)) * 100).toFixed(1)}%
-                  </p>
-                </div>
+                {displayRank != null && (
+                  <div className="rounded-xl border border-accent/15 bg-accent/5 px-4 py-2.5">
+                    <p className="text-xs text-zinc-500">Your Rank</p>
+                    <p className="text-lg font-bold text-accent-light">
+                      #{displayRank}
+                    </p>
+                  </div>
+                )}
+                {displayElo != null && (
+                  <div className="rounded-xl border border-neon-cyan/15 bg-neon-cyan/5 px-4 py-2.5">
+                    <p className="text-xs text-zinc-500">Your ELO</p>
+                    <p className="text-lg font-bold text-neon-cyan">
+                      {displayElo}
+                    </p>
+                  </div>
+                )}
+                {currentUser && (
+                  <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-2.5">
+                    <p className="text-xs text-zinc-500">Win Rate</p>
+                    <p className="text-lg font-bold text-emerald-400">
+                      {currentUserWinRate}%
+                    </p>
+                  </div>
+                )}
                 <div className="rounded-xl border border-white/5 bg-white/[0.02] px-4 py-2.5">
                   <p className="text-xs text-zinc-500">Total Players</p>
                   <p className="text-lg font-bold text-zinc-300">
-                    {leaderboardData.length}
+                    {totalPlayers}
                   </p>
                 </div>
               </div>
@@ -386,164 +515,231 @@ export default function LeaderboardPage() {
           </div>
         </div>
 
+        {/* ── Loading / Error states ── */}
+        {loading && (
+          <>
+            <div className="mt-8">
+              <PodiumSkeleton />
+            </div>
+            <div className="mt-8 rounded-2xl border border-white/5 bg-surface-light p-5 sm:p-6">
+              <div className="mb-5 h-10 w-full animate-pulse rounded-xl bg-surface-lighter" />
+              <div className="space-y-1">
+                {[...Array(10)].map((_, i) => (
+                  <TableRowSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {error && !loading && (
+          <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/5 p-12">
+            <p className="text-sm font-medium text-red-400">{error}</p>
+            <button
+              onClick={fetchLeaderboard}
+              className="mt-4 rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium text-accent-light transition-colors hover:bg-accent/20"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && players.length === 0 && (
+          <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-surface-light p-12">
+            <TrophyIcon className="mb-3 h-10 w-10 text-zinc-600" />
+            <p className="text-sm font-medium text-zinc-400">
+              No players on the leaderboard yet
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              Play your first game to appear here!
+            </p>
+            <Link
+              href="/dashboard/play"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-accent/10 px-4 py-2 text-xs font-medium text-accent-light transition-colors hover:bg-accent/20"
+            >
+              Find a Match
+            </Link>
+          </div>
+        )}
+
         {/* ── Podium ── */}
-        <div className="mt-8 flex items-end justify-center gap-2 sm:gap-4">
-          {topThree[1] && <PodiumCard player={topThree[1]} place={2} />}
-          {topThree[0] && <PodiumCard player={topThree[0]} place={1} />}
-          {topThree[2] && <PodiumCard player={topThree[2]} place={3} />}
-        </div>
+        {!loading && !error && topThree.length > 0 && (
+          <div className="mt-8 flex items-end justify-center gap-2 sm:gap-4">
+            {topThree[1] && <PodiumCard player={topThree[1]} place={2} />}
+            {topThree[0] && <PodiumCard player={topThree[0]} place={1} />}
+            {topThree[2] && <PodiumCard player={topThree[2]} place={3} />}
+          </div>
+        )}
 
         {/* ── Search + Table ── */}
-        <div className="mt-8 rounded-2xl border border-white/5 bg-surface-light p-5 sm:p-6">
-          {/* Search bar */}
-          <div className="mb-5 flex items-center gap-3">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-              <input
-                type="text"
-                placeholder="Search players..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 pl-10 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
-              />
-            </div>
-          </div>
-
-          {/* Table header */}
-          <div className="hidden items-center gap-3 border-b border-white/5 px-3 pb-3 sm:flex">
-            <div className="w-10">
-              <SortHeader
-                label="#"
-                field="rank"
-                activeField={sortField}
-                direction={sortDirection}
-                onSort={handleSort}
-              />
-            </div>
-            <div className="w-7" /> {/* Avatar space */}
-            <div className="flex-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
-              Player
-            </div>
-            <div className="w-20 text-right">
-              <SortHeader
-                label="ELO"
-                field="elo"
-                activeField={sortField}
-                direction={sortDirection}
-                onSort={handleSort}
-                align="right"
-              />
-            </div>
-            <div className="w-16 text-right">
-              <SortHeader
-                label="Wins"
-                field="wins"
-                activeField={sortField}
-                direction={sortDirection}
-                onSort={handleSort}
-                align="right"
-              />
-            </div>
-            <div className="w-16 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
-              Losses
-            </div>
-            <div className="w-20 text-right">
-              <SortHeader
-                label="Win %"
-                field="winRate"
-                activeField={sortField}
-                direction={sortDirection}
-                onSort={handleSort}
-                align="right"
-              />
-            </div>
-            <div className="w-8" /> {/* Trend space */}
-          </div>
-
-          {/* Table rows */}
-          <div className="mt-1 space-y-1">
-            {filteredAndSorted.length === 0 ? (
-              <div className="py-12 text-center">
-                <p className="text-sm text-zinc-500">No players found</p>
+        {!loading && !error && players.length > 0 && (
+          <div className="mt-8 rounded-2xl border border-white/5 bg-surface-light p-5 sm:p-6">
+            {/* Search bar */}
+            <div className="mb-5 flex items-center gap-3">
+              <div className="relative flex-1">
+                <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                <input
+                  type="text"
+                  placeholder="Search players..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 pl-10 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+                />
               </div>
-            ) : (
-              filteredAndSorted.map((player) => {
-                const winRate = ((player.wins / (player.wins + player.losses)) * 100).toFixed(1);
-                const isUser = player.isCurrentUser;
+            </div>
 
-                return (
-                  <div
-                    key={player.rank}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-3 transition-all ${
-                      isUser
-                        ? "bg-accent/5 ring-1 ring-accent/20"
-                        : "hover:bg-white/[0.03]"
-                    }`}
-                  >
-                    {/* Rank */}
-                    <div className="w-10 flex-shrink-0">
-                      <RankBadge rank={player.rank} />
-                    </div>
+            {/* Table header */}
+            <div className="hidden items-center gap-3 border-b border-white/5 px-3 pb-3 sm:flex">
+              <div className="w-10">
+                <SortHeader
+                  label="#"
+                  field="rank"
+                  activeField={sortField}
+                  direction={sortDirection}
+                  onSort={handleSort}
+                />
+              </div>
+              <div className="w-7" /> {/* Avatar space */}
+              <div className="flex-1 text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Player
+              </div>
+              <div className="w-20 text-right">
+                <SortHeader
+                  label="ELO"
+                  field="elo"
+                  activeField={sortField}
+                  direction={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                />
+              </div>
+              <div className="w-16 text-right">
+                <SortHeader
+                  label="Wins"
+                  field="wins"
+                  activeField={sortField}
+                  direction={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                />
+              </div>
+              <div className="w-16 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Losses
+              </div>
+              <div className="w-20 text-right">
+                <SortHeader
+                  label="Win %"
+                  field="winRate"
+                  activeField={sortField}
+                  direction={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                />
+              </div>
+              <div className="w-14 text-right text-xs font-medium uppercase tracking-wider text-zinc-500">
+                Level
+              </div>
+            </div>
 
-                    {/* Avatar */}
-                    <div
-                      className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 ${
+            {/* Table rows */}
+            <div className="mt-1 space-y-1">
+              {filteredAndSorted.length === 0 ? (
+                <div className="py-12 text-center">
+                  <p className="text-sm text-zinc-500">No players found</p>
+                </div>
+              ) : (
+                filteredAndSorted.map((player) => {
+                  const total = player.wins + player.losses + player.draws;
+                  const winRate = total > 0
+                    ? ((player.wins / total) * 100).toFixed(1)
+                    : "0.0";
+                  const isUser = player.isCurrentUser;
+
+                  return (
+                    <Link
+                      key={player.userId}
+                      href={isUser ? "/dashboard/profile" : `/dashboard/player/${player.username}`}
+                      className={`flex items-center gap-3 rounded-xl px-3 py-3 transition-all ${
                         isUser
-                          ? "bg-accent/20 text-accent-light ring-1 ring-accent/30"
-                          : "bg-white/5 text-zinc-400"
+                          ? "bg-accent/5 ring-1 ring-accent/20"
+                          : "hover:bg-white/[0.03]"
                       }`}
                     >
-                      {player.avatar}
-                    </div>
+                      {/* Rank */}
+                      <div className="w-10 flex-shrink-0">
+                        <RankBadge rank={player.rank} />
+                      </div>
 
-                    {/* Name + mobile stats */}
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`truncate text-sm font-medium ${
-                          isUser ? "text-accent-light" : "text-zinc-200"
-                        }`}
-                      >
-                        {player.name}
-                        {isUser && (
-                          <span className="ml-1.5 text-xs text-accent/60">(you)</span>
-                        )}
-                      </p>
-                      {/* Mobile-only stats */}
-                      <p className="mt-0.5 text-xs text-zinc-500 sm:hidden">
-                        {player.elo} ELO · {player.wins}W / {player.losses}L · {winRate}%
-                      </p>
-                    </div>
+                      {/* Avatar */}
+                      {player.avatarUrl ? (
+                        <img
+                          src={player.avatarUrl}
+                          alt={player.username}
+                          className={`h-8 w-8 flex-shrink-0 rounded-full object-cover sm:h-7 sm:w-7 ${
+                            isUser ? "ring-1 ring-accent/30" : ""
+                          }`}
+                        />
+                      ) : (
+                        <div
+                          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 ${
+                            isUser
+                              ? "bg-accent/20 text-accent-light ring-1 ring-accent/30"
+                              : "bg-white/5 text-zinc-400"
+                          }`}
+                        >
+                          {player.avatar}
+                        </div>
+                      )}
 
-                    {/* Desktop stats */}
-                    <div className="hidden w-20 text-right sm:block">
-                      <span className="text-sm font-semibold text-neon-cyan">
-                        {player.elo}
-                      </span>
-                    </div>
-                    <div className="hidden w-16 text-right sm:block">
-                      <span className="text-sm text-emerald-400">
-                        {player.wins}
-                      </span>
-                    </div>
-                    <div className="hidden w-16 text-right sm:block">
-                      <span className="text-sm text-red-400/70">
-                        {player.losses}
-                      </span>
-                    </div>
-                    <div className="hidden w-20 text-right sm:block">
-                      <span className="text-sm text-zinc-300">{winRate}%</span>
-                    </div>
+                      {/* Name + mobile stats */}
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`truncate text-sm font-medium ${
+                            isUser ? "text-accent-light" : "text-zinc-200"
+                          }`}
+                        >
+                          {player.username}
+                          {isUser && (
+                            <span className="ml-1.5 text-xs text-accent/60">(you)</span>
+                          )}
+                        </p>
+                        {/* Mobile-only stats */}
+                        <p className="mt-0.5 text-xs text-zinc-500 sm:hidden">
+                          {player.elo} ELO &middot; {player.wins}W / {player.losses}L &middot; {winRate}%
+                        </p>
+                      </div>
 
-                    {/* Trend */}
-                    <div className="w-8 flex-shrink-0 text-center">
-                      <TrendIndicator trend={player.trend} />
-                    </div>
-                  </div>
-                );
-              })
-            )}
+                      {/* Desktop stats */}
+                      <div className="hidden w-20 text-right sm:block">
+                        <span className="text-sm font-semibold text-neon-cyan">
+                          {player.elo}
+                        </span>
+                      </div>
+                      <div className="hidden w-16 text-right sm:block">
+                        <span className="text-sm text-emerald-400">
+                          {player.wins}
+                        </span>
+                      </div>
+                      <div className="hidden w-16 text-right sm:block">
+                        <span className="text-sm text-red-400/70">
+                          {player.losses}
+                        </span>
+                      </div>
+                      <div className="hidden w-20 text-right sm:block">
+                        <span className="text-sm text-zinc-300">{winRate}%</span>
+                      </div>
+                      <div className="hidden w-14 text-right sm:block">
+                        <span className="text-sm text-zinc-400">
+                          Lv.{player.level}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

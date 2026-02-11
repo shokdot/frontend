@@ -1,433 +1,431 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import {
+	getMyProfile,
+	getPlayerStats,
+	getPlayerRank,
+	getMatchHistory,
+	getUserById,
+	ApiUserProfile,
+	ApiPlayerStats,
+	ApiPlayerRank,
+} from "@/lib/api";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
-function EditIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  );
-}
-
-function CameraIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-      <circle cx="12" cy="13" r="4" />
-    </svg>
-  );
+function UserEditIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+			<path d="M11 21H4a2 2 0 01-2-2v-1a5 5 0 015-5h2" />
+			<circle cx="9" cy="7" r="4" />
+			<path d="M17.5 12.5l-1.4 1.4a2 2 0 00-.5.9l-.3 1.5a.5.5 0 00.6.6l1.5-.3a2 2 0 00.9-.5l1.4-1.4a1.4 1.4 0 00-2.2-2.2z" />
+		</svg>
+	);
 }
 
 function CalendarIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
+	return (
+		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+			<rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+			<line x1="16" y1="2" x2="16" y2="6" />
+			<line x1="8" y1="2" x2="8" y2="6" />
+			<line x1="3" y1="10" x2="21" y2="10" />
+		</svg>
+	);
 }
 
 function ChartIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 20V10M12 20V4M6 20v-6" />
-    </svg>
-  );
+	return (
+		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+			<path d="M18 20V10M12 20V4M6 20v-6" />
+		</svg>
+	);
 }
 
-function GlobeIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="2" y1="12" x2="22" y2="12" />
-      <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
-    </svg>
-  );
+/* ──────────────────────── Helpers ──────────────────────── */
+
+function formatJoinDate(isoDate: string): string {
+	const date = new Date(isoDate);
+	return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
-function XIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
+function getInitials(displayName: string | null, username: string): string {
+	const name = displayName || username;
+	return name
+		.split(" ")
+		.map((w) => w[0])
+		.join("")
+		.toUpperCase()
+		.slice(0, 2);
 }
 
-function GithubIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
-    </svg>
-  );
+function timeAgo(isoDate: string): string {
+	const seconds = Math.floor(
+		(Date.now() - new Date(isoDate).getTime()) / 1000,
+	);
+	if (seconds < 60) return "just now";
+	const minutes = Math.floor(seconds / 60);
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	if (days === 1) return "Yesterday";
+	return `${days} days ago`;
 }
 
-/* ──────────────────────── Mock Data ──────────────────────── */
+/* ──────────────────────── Types ──────────────────────── */
 
-const profileData = {
-  username: "Player",
-  displayName: "Player One",
-  email: "player@example.com",
-  bio: "Competitive pong player. Always looking for a challenge. Let's see what you've got!",
-  avatar: "PO",
-  status: "online" as const,
-  joinDate: "January 2026",
-  location: "Paris, France",
-  elo: 1850,
-  rank: 4,
-  stats: {
-    wins: 87,
-    losses: 47,
-    totalMatches: 134,
-    winRate: 64.9,
-    winStreak: 3,
-    bestStreak: 8,
-    avgScore: 9.2,
-    totalPlayTime: "48h 32m",
-  },
-  linkedAccounts: {
-    github: true,
-  },
-};
-
-interface MatchData {
-  id: number;
-  opponent: string;
-  result: "win" | "loss";
-  score: string;
-  date: string;
-  eloChange: number;
+interface ResolvedMatch {
+	id: string;
+	opponentName: string;
+	result: "win" | "loss" | "draw";
+	score: string;
+	date: string;
 }
 
-const matchHistory: MatchData[] = [
-  { id: 1, opponent: "NeonBlade42", result: "win", score: "11 - 7", date: "2 hours ago", eloChange: +18 },
-  { id: 2, opponent: "PixelStorm", result: "loss", score: "9 - 11", date: "5 hours ago", eloChange: -14 },
-  { id: 3, opponent: "CyberPaddle", result: "win", score: "11 - 3", date: "Yesterday", eloChange: +12 },
-  { id: 4, opponent: "QuantumServe", result: "win", score: "11 - 9", date: "Yesterday", eloChange: +22 },
-  { id: 5, opponent: "VortexPlayer", result: "loss", score: "6 - 11", date: "2 days ago", eloChange: -16 },
-  { id: 6, opponent: "RetroWave", result: "win", score: "11 - 5", date: "2 days ago", eloChange: +15 },
-  { id: 7, opponent: "ArcadeKing", result: "win", score: "11 - 8", date: "3 days ago", eloChange: +20 },
-  { id: 8, opponent: "GlitchMaster", result: "loss", score: "7 - 11", date: "3 days ago", eloChange: -12 },
-];
+/* ──────────────────────── Loading Skeleton ──────────────────────── */
 
-/* ──────────────────────── Edit Profile Modal ──────────────────────── */
-
-function EditProfileModal({
-  isOpen,
-  onClose,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-}) {
-  const [displayName, setDisplayName] = useState(profileData.displayName);
-  const [bio, setBio] = useState(profileData.bio);
-  const [isSaving, setIsSaving] = useState(false);
-
-  if (!isOpen) return null;
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    setIsSaving(true);
-    // TODO: wire to API — PATCH /api/v1/users/me
-    await new Promise((r) => setTimeout(r, 800));
-    setIsSaving(false);
-    onClose();
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-
-      <div className="relative w-full max-w-lg rounded-2xl border border-white/5 bg-surface-light p-6 shadow-[0_0_40px_rgba(139,92,246,0.1)] sm:p-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">Edit Profile</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white">
-            <XIcon className="h-5 w-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSave} className="space-y-5">
-          {/* Avatar upload */}
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/20 text-xl font-bold text-accent-light ring-2 ring-accent/30">
-                {profileData.avatar}
-              </div>
-              <button
-                type="button"
-                className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-white shadow-[0_0_10px_rgba(139,92,246,0.4)] transition-all hover:shadow-[0_0_15px_rgba(139,92,246,0.6)]"
-              >
-                <CameraIcon className="h-3.5 w-3.5" />
-              </button>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-white">Profile photo</p>
-              <p className="text-xs text-zinc-500">JPG, PNG or GIF. Max 2MB.</p>
-            </div>
-          </div>
-
-          {/* Display Name */}
-          <div>
-            <label htmlFor="displayName" className="mb-1.5 block text-sm font-medium text-zinc-300">
-              Display Name
-            </label>
-            <input
-              id="displayName"
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-all focus:border-neon-cyan/40 focus:shadow-[0_0_15px_rgba(0,240,255,0.1)] focus:ring-1 focus:ring-neon-cyan/30"
-            />
-          </div>
-
-          {/* Bio */}
-          <div>
-            <label htmlFor="bio" className="mb-1.5 block text-sm font-medium text-zinc-300">
-              Bio
-            </label>
-            <textarea
-              id="bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              rows={3}
-              maxLength={160}
-              className="w-full resize-none rounded-lg border border-white/10 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-all focus:border-neon-cyan/40 focus:shadow-[0_0_15px_rgba(0,240,255,0.1)] focus:ring-1 focus:ring-neon-cyan/30"
-            />
-            <p className="mt-1 text-right text-xs text-zinc-600">{bio.length}/160</p>
-          </div>
-
-          {/* Buttons */}
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-lg border border-white/10 bg-surface-lighter py-2.5 text-sm font-medium text-zinc-300 transition-all hover:border-white/20 hover:text-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="flex-1 rounded-lg bg-accent py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(139,92,246,0.3)] transition-all hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSaving ? (
-                <span className="inline-flex items-center gap-2">
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                  </svg>
-                  Saving...
-                </span>
-              ) : (
-                "Save changes"
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+function ProfileSkeleton() {
+	return (
+		<div className="relative">
+			<div className="pointer-events-none absolute top-0 right-0 h-[400px] w-[400px] rounded-full bg-accent/5 blur-[150px]" />
+			<div className="relative z-10 p-4 sm:p-6 lg:p-8">
+				{/* Header skeleton */}
+				<div className="overflow-hidden rounded-2xl border border-accent/15 bg-surface-light">
+					<div className="h-32 animate-pulse bg-gradient-to-br from-accent/10 via-neon-purple/5 to-neon-cyan/5 sm:h-40" />
+					<div className="px-5 pb-6 sm:px-8 sm:pb-8">
+						<div className="-mt-14 mb-4 sm:-mt-16">
+							<div className="h-24 w-24 animate-pulse rounded-full bg-surface-lighter ring-4 ring-surface-light sm:h-28 sm:w-28" />
+						</div>
+						<div className="space-y-3">
+							<div className="h-8 w-48 animate-pulse rounded-lg bg-surface-lighter" />
+							<div className="h-4 w-32 animate-pulse rounded bg-surface-lighter" />
+							<div className="h-4 w-72 animate-pulse rounded bg-surface-lighter" />
+						</div>
+					</div>
+				</div>
+				{/* Stats skeleton */}
+				<div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+					{[...Array(4)].map((_, i) => (
+						<div key={i} className="rounded-2xl border border-white/5 bg-surface-light p-4 sm:p-5">
+							<div className="mx-auto h-8 w-16 animate-pulse rounded bg-surface-lighter" />
+							<div className="mx-auto mt-2 h-3 w-12 animate-pulse rounded bg-surface-lighter" />
+						</div>
+					))}
+				</div>
+			</div>
+		</div>
+	);
 }
 
 /* ──────────────────────── Page ──────────────────────── */
 
 export default function ProfilePage() {
-  const [isEditing, setIsEditing] = useState(false);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
-  const { stats } = profileData;
+	const [profile, setProfile] = useState<ApiUserProfile | null>(null);
+	const [stats, setStats] = useState<ApiPlayerStats | null>(null);
+	const [rank, setRank] = useState<ApiPlayerRank | null>(null);
+	const [matches, setMatches] = useState<ResolvedMatch[]>([]);
 
-  return (
-    <div className="relative">
-      {/* Background effects */}
-      <div className="pointer-events-none absolute top-0 right-0 h-[400px] w-[400px] rounded-full bg-accent/5 blur-[150px]" />
-      <div className="pointer-events-none absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-neon-cyan/3 blur-[120px]" />
+	const fetchData = useCallback(async () => {
+		try {
+			setLoading(true);
+			setError(null);
 
-      <div className="relative z-10 p-4 sm:p-6 lg:p-8">
-        {/* ── Profile Header ── */}
-        <div className="relative overflow-hidden rounded-2xl border border-accent/15 bg-surface-light neon-box-purple">
-          {/* Banner gradient */}
-          <div className="h-32 bg-gradient-to-br from-accent/20 via-neon-purple/10 to-neon-cyan/10 sm:h-40">
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.04)_1px,transparent_1px)] bg-[size:40px_40px]" />
-          </div>
+			// 1. Get the user profile first (we need userId for other calls)
+			const profileRes = await getMyProfile();
+			const profileData = profileRes.data;
+			setProfile(profileData);
 
-          <div className="relative px-5 pb-6 sm:px-8 sm:pb-8">
-            {/* Avatar */}
-            <div className="relative -mt-14 mb-4 inline-block sm:-mt-16">
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-light text-2xl font-bold text-accent-light ring-4 ring-surface-light sm:h-28 sm:w-28 sm:text-3xl">
-                <div className="flex h-full w-full items-center justify-center rounded-full bg-accent/20 ring-2 ring-accent/30">
-                  {profileData.avatar}
-                </div>
-              </div>
-              {/* Online indicator */}
-              <span className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-400 ring-[3px] ring-surface-light shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-            </div>
+			// 2. Fetch stats, rank, and match history in parallel
+			const [statsRes, rankRes, historyRes] = await Promise.allSettled([
+				getPlayerStats(profileData.userId),
+				getPlayerRank(profileData.userId),
+				getMatchHistory(profileData.userId, 1, 10),
+			]);
 
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              {/* Info */}
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-bold text-white sm:text-3xl">
-                    {profileData.displayName}
-                  </h1>
-                  <span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent-light">
-                    #{profileData.rank}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-sm text-zinc-500">@{profileData.username}</p>
-                <p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">
-                  {profileData.bio}
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
-                  <span className="inline-flex items-center gap-1.5">
-                    <CalendarIcon className="h-3.5 w-3.5" />
-                    Joined {profileData.joinDate}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <GlobeIcon className="h-3.5 w-3.5" />
-                    {profileData.location}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <ChartIcon className="h-3.5 w-3.5" />
-                    {profileData.elo} ELO
-                  </span>
-                  {profileData.linkedAccounts.github && (
-                    <span className="inline-flex items-center gap-1.5">
-                      <GithubIcon className="h-3.5 w-3.5" />
-                      GitHub linked
-                    </span>
-                  )}
-                </div>
-              </div>
+			if (statsRes.status === "fulfilled") {
+				setStats(statsRes.value.data);
+			}
 
-              {/* Edit button */}
-              <button
-                onClick={() => setIsEditing(true)}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-surface-lighter px-4 py-2 text-sm font-medium text-zinc-300 transition-all hover:border-accent/30 hover:text-white hover:shadow-[0_0_15px_rgba(139,92,246,0.1)] sm:self-auto"
-              >
-                <EditIcon className="h-4 w-4" />
-                Edit Profile
-              </button>
-            </div>
-          </div>
-        </div>
+			if (rankRes.status === "fulfilled") {
+				setRank(rankRes.value.data);
+			}
 
-        {/* ── Stats grid ── */}
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          <div className="rounded-2xl border border-white/5 bg-surface-light p-4 text-center transition-all hover:border-accent/20 hover:shadow-[0_0_25px_rgba(139,92,246,0.06)] sm:p-5">
-            <p className="text-2xl font-bold text-white">{stats.wins}</p>
-            <p className="mt-0.5 text-xs text-zinc-500">Wins</p>
-            <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-emerald-500/30">
-              <div
-                className="h-full rounded-full bg-emerald-400"
-                style={{ width: `${stats.winRate}%` }}
-              />
-            </div>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-surface-light p-4 text-center transition-all hover:border-red-500/20 hover:shadow-[0_0_25px_rgba(239,68,68,0.06)] sm:p-5">
-            <p className="text-2xl font-bold text-white">{stats.losses}</p>
-            <p className="mt-0.5 text-xs text-zinc-500">Losses</p>
-            <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-red-500/30">
-              <div
-                className="h-full rounded-full bg-red-400"
-                style={{ width: `${100 - stats.winRate}%` }}
-              />
-            </div>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-surface-light p-4 text-center transition-all hover:border-neon-cyan/20 hover:shadow-[0_0_25px_rgba(0,240,255,0.06)] sm:p-5">
-            <p className="text-2xl font-bold text-neon-cyan neon-text-cyan">{stats.winRate}%</p>
-            <p className="mt-0.5 text-xs text-zinc-500">Win Rate</p>
-          </div>
-          <div className="rounded-2xl border border-white/5 bg-surface-light p-4 text-center transition-all hover:border-neon-pink/20 hover:shadow-[0_0_25px_rgba(224,64,251,0.06)] sm:p-5">
-            <p className="text-2xl font-bold text-white">{stats.totalPlayTime}</p>
-            <p className="mt-0.5 text-xs text-zinc-500">Play Time</p>
-          </div>
-        </div>
+			// 3. Resolve match history opponent names
+			if (historyRes.status === "fulfilled") {
+				const rawMatches = historyRes.value.data;
+				const opponentIds = new Set(
+					rawMatches.map((m) =>
+						m.playerAId === profileData.userId ? m.playerBId : m.playerAId,
+					),
+				);
 
-        {/* ── Match History ── */}
-        <div className="mt-6 rounded-2xl border border-white/5 bg-surface-light p-5 sm:p-6">
-          <h2 className="mb-4 text-lg font-semibold text-white">Match History</h2>
+				// Batch-resolve unique opponent usernames
+				const userCache = new Map<string, string>();
+				await Promise.allSettled(
+					[...opponentIds].map(async (id) => {
+						try {
+							const res = await getUserById(id);
+							userCache.set(id, res.data.username);
+						} catch {
+							userCache.set(id, "Unknown");
+						}
+					}),
+				);
 
-          {/* Table header (desktop) */}
-          <div className="mb-3 hidden grid-cols-[1fr_auto_auto_auto] gap-4 px-4 text-xs font-medium uppercase tracking-wider text-zinc-500 sm:grid">
-            <span>Opponent</span>
-            <span className="w-20 text-center">Score</span>
-            <span className="w-20 text-center">ELO</span>
-            <span className="w-24 text-right">Date</span>
-          </div>
+				const resolved: ResolvedMatch[] = rawMatches.map((m) => {
+					const isPlayerA = m.playerAId === profileData.userId;
+					const opponentId = isPlayerA ? m.playerBId : m.playerAId;
+					const myScore = isPlayerA ? m.scoreA : m.scoreB;
+					const opScore = isPlayerA ? m.scoreB : m.scoreA;
 
-          <div className="space-y-2">
-            {matchHistory.map((match) => {
-              const isWin = match.result === "win";
-              return (
-                <div
-                  key={match.id}
-                  className="flex items-center gap-4 rounded-xl border border-white/5 bg-surface-lighter/50 px-4 py-3 transition-all hover:border-white/10 hover:bg-surface-lighter"
-                >
-                  {/* Result indicator */}
-                  <div
-                    className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                      isWin ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                    }`}
-                  >
-                    {isWin ? "W" : "L"}
-                  </div>
+					let result: "win" | "loss" | "draw";
+					if (m.winnerId === profileData.userId) result = "win";
+					else if (m.winnerId === null) result = "draw";
+					else result = "loss";
 
-                  {/* Opponent */}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-white">
-                      vs {match.opponent}
-                    </p>
-                    <p className="text-xs text-zinc-500 sm:hidden">{match.date}</p>
-                  </div>
+					return {
+						id: m.id,
+						opponentName: userCache.get(opponentId) || "Unknown",
+						result,
+						score: `${myScore} - ${opScore}`,
+						date: timeAgo(m.playedAt),
+					};
+				});
 
-                  {/* Score */}
-                  <span
-                    className={`text-sm font-semibold ${
-                      isWin ? "text-emerald-400" : "text-red-400"
-                    }`}
-                  >
-                    {match.score}
-                  </span>
+				setMatches(resolved);
+			}
+		} catch (err: unknown) {
+			const message =
+				err instanceof Error ? err.message : "Failed to load profile";
+			setError(message);
+		} finally {
+			setLoading(false);
+		}
+	}, []);
 
-                  {/* ELO change */}
-                  <span
-                    className={`hidden w-20 text-center text-sm font-medium sm:block ${
-                      match.eloChange > 0 ? "text-emerald-400" : "text-red-400"
-                    }`}
-                  >
-                    {match.eloChange > 0 ? "+" : ""}
-                    {match.eloChange}
-                  </span>
+	useEffect(() => {
+		fetchData();
+	}, [fetchData]);
 
-                  {/* Date (desktop) */}
-                  <span className="hidden w-24 text-right text-xs text-zinc-500 sm:block">
-                    {match.date}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+	if (loading) return <ProfileSkeleton />;
 
-          <div className="mt-4 text-center">
-            <Link
-              href="/dashboard/history"
-              className="text-xs font-medium text-zinc-500 transition-colors hover:text-neon-cyan"
-            >
-              View full match history
-            </Link>
-          </div>
-        </div>
-      </div>
+	if (error || !profile) {
+		return (
+			<div className="flex min-h-[400px] items-center justify-center p-8">
+				<div className="text-center">
+					<p className="text-lg font-semibold text-red-400">
+						{error || "Failed to load profile"}
+					</p>
+					<button
+						onClick={fetchData}
+						className="mt-4 rounded-lg border border-white/10 bg-surface-lighter px-4 py-2 text-sm text-zinc-300 transition-all hover:border-accent/30 hover:text-white"
+					>
+						Try again
+					</button>
+				</div>
+			</div>
+		);
+	}
 
-      {/* Edit modal */}
-      <EditProfileModal isOpen={isEditing} onClose={() => setIsEditing(false)} />
-    </div>
-  );
+	const wins = stats?.wins ?? 0;
+	const losses = stats?.losses ?? 0;
+	const draws = stats?.draws ?? 0;
+	const totalMatches = wins + losses + draws;
+	const winRate = totalMatches > 0 ? ((wins / totalMatches) * 100).toFixed(1) : "0.0";
+	const elo = rank?.elo ?? stats?.elo ?? 0;
+	const playerRank = rank?.rank ?? 0;
+
+	return (
+		<div className="relative">
+			{/* Background effects */}
+			<div className="pointer-events-none absolute top-0 right-0 h-[400px] w-[400px] rounded-full bg-accent/5 blur-[150px]" />
+			<div className="pointer-events-none absolute bottom-0 left-0 h-[300px] w-[300px] rounded-full bg-neon-cyan/3 blur-[120px]" />
+
+			<div className="relative z-10 p-4 sm:p-6 lg:p-8">
+				{/* ── Profile Header ── */}
+				<div className="relative overflow-hidden rounded-2xl border border-accent/15 bg-surface-light neon-box-purple">
+					{/* Banner gradient */}
+					<div className="h-32 bg-gradient-to-br from-accent/20 via-neon-purple/10 to-neon-cyan/10 sm:h-40">
+						<div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.04)_1px,transparent_1px)] bg-[size:40px_40px]" />
+					</div>
+
+					<div className="relative px-5 pb-6 sm:px-8 sm:pb-8">
+						{/* Avatar */}
+						<div className="relative -mt-14 mb-4 inline-block sm:-mt-16">
+							<div className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-light text-2xl font-bold text-accent-light ring-4 ring-surface-light sm:h-28 sm:w-28 sm:text-3xl">
+								<div className="flex h-full w-full items-center justify-center rounded-full bg-accent/20 ring-2 ring-accent/30">
+									{profile.avatarUrl ? (
+										<img src={profile.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" />
+									) : (
+										getInitials(profile.displayName, profile.username)
+									)}
+								</div>
+							</div>
+							{/* Online indicator */}
+							<span className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-400 ring-[3px] ring-surface-light shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+						</div>
+
+						<div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+							{/* Info */}
+							<div>
+								<div className="flex items-center gap-3">
+									<h1 className="text-2xl font-bold text-white sm:text-3xl">
+										{profile.displayName || profile.username}
+									</h1>
+									{playerRank > 0 && (
+										<span className="rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent-light">
+											#{playerRank}
+										</span>
+									)}
+								</div>
+								<p className="mt-0.5 text-sm text-zinc-500">@{profile.username}</p>
+								{profile.bio && (
+									<p className="mt-2 max-w-md text-sm leading-relaxed text-zinc-400">
+										{profile.bio}
+									</p>
+								)}
+								<div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
+									<span className="inline-flex items-center gap-1.5">
+										<CalendarIcon className="h-3.5 w-3.5" />
+										Joined {formatJoinDate(profile.createdAt)}
+									</span>
+									<span className="inline-flex items-center gap-1.5">
+										<ChartIcon className="h-3.5 w-3.5" />
+										{elo} ELO
+									</span>
+								</div>
+							</div>
+
+							{/* Edit button — navigates to Settings */}
+							<Link
+								href="/dashboard/settings"
+								className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-surface-lighter px-4 py-2 text-sm font-medium text-zinc-300 transition-all hover:border-accent/30 hover:text-white hover:shadow-[0_0_15px_rgba(139,92,246,0.1)] sm:self-auto"
+							>
+								<UserEditIcon className="h-4 w-4" />
+								Edit Profile
+							</Link>
+						</div>
+					</div>
+				</div>
+
+				{/* ── Stats grid ── */}
+				<div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+					<div className="rounded-2xl border border-white/5 bg-surface-light p-4 text-center transition-all hover:border-accent/20 hover:shadow-[0_0_25px_rgba(139,92,246,0.06)] sm:p-5">
+						<p className="text-2xl font-bold text-white">{wins}</p>
+						<p className="mt-0.5 text-xs text-zinc-500">Wins</p>
+						<div className="mx-auto mt-2 h-1 w-12 rounded-full bg-emerald-500/30">
+							<div
+								className="h-full rounded-full bg-emerald-400"
+								style={{ width: `${Number(winRate)}%` }}
+							/>
+						</div>
+					</div>
+					<div className="rounded-2xl border border-white/5 bg-surface-light p-4 text-center transition-all hover:border-red-500/20 hover:shadow-[0_0_25px_rgba(239,68,68,0.06)] sm:p-5">
+						<p className="text-2xl font-bold text-white">{losses}</p>
+						<p className="mt-0.5 text-xs text-zinc-500">Losses</p>
+						<div className="mx-auto mt-2 h-1 w-12 rounded-full bg-red-500/30">
+							<div
+								className="h-full rounded-full bg-red-400"
+								style={{ width: `${100 - Number(winRate)}%` }}
+							/>
+						</div>
+					</div>
+					<div className="rounded-2xl border border-white/5 bg-surface-light p-4 text-center transition-all hover:border-neon-cyan/20 hover:shadow-[0_0_25px_rgba(0,240,255,0.06)] sm:p-5">
+						<p className="text-2xl font-bold text-neon-cyan neon-text-cyan">{winRate}%</p>
+						<p className="mt-0.5 text-xs text-zinc-500">Win Rate</p>
+					</div>
+					<div className="rounded-2xl border border-white/5 bg-surface-light p-4 text-center transition-all hover:border-neon-pink/20 hover:shadow-[0_0_25px_rgba(224,64,251,0.06)] sm:p-5">
+						<p className="text-2xl font-bold text-white">{totalMatches}</p>
+						<p className="mt-0.5 text-xs text-zinc-500">Total Matches</p>
+					</div>
+				</div>
+
+				{/* ── Match History ── */}
+				<div className="mt-6 rounded-2xl border border-white/5 bg-surface-light p-5 sm:p-6">
+					<h2 className="mb-4 text-lg font-semibold text-white">Match History</h2>
+
+					{matches.length === 0 ? (
+						<p className="py-8 text-center text-sm text-zinc-500">
+							No matches played yet. Start a game to see your history!
+						</p>
+					) : (
+						<>
+							{/* Table header (desktop) */}
+							<div className="mb-3 hidden grid-cols-[1fr_auto_auto] gap-4 px-4 text-xs font-medium uppercase tracking-wider text-zinc-500 sm:grid">
+								<span>Opponent</span>
+								<span className="w-20 text-center">Score</span>
+								<span className="w-24 text-right">Date</span>
+							</div>
+
+							<div className="space-y-2">
+								{matches.map((match) => {
+									const isWin = match.result === "win";
+									const isDraw = match.result === "draw";
+									return (
+										<div
+											key={match.id}
+											className="flex items-center gap-4 rounded-xl border border-white/5 bg-surface-lighter/50 px-4 py-3 transition-all hover:border-white/10 hover:bg-surface-lighter"
+										>
+											{/* Result indicator */}
+											<div
+												className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold ${isDraw
+													? "bg-zinc-500/10 text-zinc-400"
+													: isWin
+														? "bg-emerald-500/10 text-emerald-400"
+														: "bg-red-500/10 text-red-400"
+													}`}
+											>
+												{isDraw ? "D" : isWin ? "W" : "L"}
+											</div>
+
+											{/* Opponent */}
+											<div className="min-w-0 flex-1">
+												<p className="truncate text-sm font-medium text-white">
+													vs {match.opponentName}
+												</p>
+												<p className="text-xs text-zinc-500 sm:hidden">{match.date}</p>
+											</div>
+
+											{/* Score */}
+											<span
+												className={`text-sm font-semibold ${isDraw
+													? "text-zinc-400"
+													: isWin
+														? "text-emerald-400"
+														: "text-red-400"
+													}`}
+											>
+												{match.score}
+											</span>
+
+											{/* Date (desktop) */}
+											<span className="hidden w-24 text-right text-xs text-zinc-500 sm:block">
+												{match.date}
+											</span>
+										</div>
+									);
+								})}
+							</div>
+
+							<div className="mt-4 text-center">
+								<Link
+									href="/dashboard/history"
+									className="text-xs font-medium text-zinc-500 transition-colors hover:text-neon-cyan"
+								>
+									View full match history
+								</Link>
+							</div>
+						</>
+					)}
+				</div>
+			</div>
+
+		</div>
+	);
 }
