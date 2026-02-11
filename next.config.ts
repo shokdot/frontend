@@ -12,6 +12,16 @@ function baseUrl(url: string): string {
 
 const nextConfig: NextConfig = {
 	output: "standalone",
+	webpack: (config, { dev }) => {
+		if (dev) {
+			config.watchOptions = {
+				poll: 1000,
+				aggregateTimeout: 300,
+				ignored: /node_modules/,
+			};
+		}
+		return config;
+	},
 	async rewrites() {
 		const authUrl = baseUrl(process.env.AUTH_SERVICE_URL || "http://auth-service:3000");
 		const userUrl = baseUrl(process.env.USER_SERVICE_URL || "http://user-service:3001");
