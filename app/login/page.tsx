@@ -2,8 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/dashboard";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,7 +32,7 @@ export default function LoginPage() {
         throw new Error(data?.message || "Invalid email or password");
       }
 
-      window.location.href = "/dashboard";
+      window.location.href = redirectTo;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
