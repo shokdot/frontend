@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
 	listFriends,
@@ -15,6 +15,7 @@ import {
 	type ApiPlayerStats,
 	type ApiPlayerRank,
 } from "@/lib/api";
+import { useStatusMap, mapBackendStatus, type UserStatus } from "../components/StatusProvider";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -253,17 +254,6 @@ interface FriendData {
 	avatarUrl: string | null;
 }
 
-function mapStatus(backendStatus: string): OnlineStatus | null {
-	switch (backendStatus?.toUpperCase()) {
-		case "ONLINE":
-			return "online";
-		case "IN_GAME":
-			return "in-game";
-		default:
-			return null; // offline — not shown
-	}
-}
-
 function FriendRow({ friend }: { friend: FriendData }) {
 	const statusColors: Record<OnlineStatus, string> = {
 		online: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
@@ -278,7 +268,10 @@ function FriendRow({ friend }: { friend: FriendData }) {
 	};
 
 	return (
-		<div className="flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:bg-white/5">
+		<Link
+			href={`/dashboard/player/${friend.name}`}
+			className="flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:bg-white/5"
+		>
 			{/* Avatar */}
 			<div className="relative flex-shrink-0">
 				{friend.avatarUrl ? (
@@ -303,11 +296,11 @@ function FriendRow({ friend }: { friend: FriendData }) {
 
 			{/* Challenge button */}
 			{friend.status === "online" && (
-				<button className="rounded-md bg-accent/10 px-2 py-1 text-xs font-medium text-accent-light transition-colors hover:bg-accent/20">
+				<span className="rounded-md bg-accent/10 px-2 py-1 text-xs font-medium text-accent-light transition-colors hover:bg-accent/20">
 					Invite
-				</button>
+				</span>
 			)}
-		</div>
+		</Link>
 	);
 }
 
@@ -405,7 +398,8 @@ function StatCardSkeleton() {
 /* ──────────────────────── Page ──────────────────────── */
 
 export default function DashboardPage() {
-	const [onlineFriends, setOnlineFriends] = useState<FriendData[]>([]);
+	const liveStatuses = useStatusMap();
+	const [rawFriends, setRawFriends] = useState<(FriendData & { apiStatus: UserStatus })[]>([]);
 	const [friendsLoading, setFriendsLoading] = useState(true);
 
 	const [profile, setProfile] = useState<ApiUserProfile | null>(null);
@@ -504,26 +498,31 @@ export default function DashboardPage() {
 	useEffect(() => {
 		listFriends("accepted")
 			.then((res) => {
-				const online: FriendData[] = [];
-				for (const f of res.data.friends) {
-					const status = mapStatus(f.onlineStatus);
-					if (status) {
-						online.push({
-							userId: f.userId,
-							name: f.username,
-							avatar: f.username.slice(0, 2).toUpperCase(),
-							avatarUrl: f.avatarUrl,
-							status,
-						});
-					}
-				}
-				setOnlineFriends(online);
+				const friends = res.data.friends.map((f) => ({
+					userId: f.userId,
+					name: f.username,
+					avatar: f.username.slice(0, 2).toUpperCase(),
+					avatarUrl: f.avatarUrl,
+					status: mapBackendStatus(f.onlineStatus) as OnlineStatus,
+					apiStatus: mapBackendStatus(f.onlineStatus),
+				}));
+				setRawFriends(friends);
 			})
 			.catch(() => {
 				// Silently fail — widget is non-critical
 			})
 			.finally(() => setFriendsLoading(false));
 	}, []);
+
+	// Compute online friends using live statuses from WebSocket
+	const onlineFriends = useMemo(() => {
+		return rawFriends
+			.map((f) => {
+				const liveStatus = liveStatuses.get(f.userId) ?? f.apiStatus;
+				return { ...f, status: liveStatus as OnlineStatus };
+			})
+			.filter((f) => (f.status as string) !== "offline");
+	}, [rawFriends, liveStatuses]);
 
 	// Fetch leaderboard preview (top 5) — runs after profile is available
 	useEffect(() => {

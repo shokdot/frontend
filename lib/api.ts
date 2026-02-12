@@ -355,3 +355,85 @@ export function unblockUser(targetUsername: string) {
 		},
 	);
 }
+
+/* ───────────── Notifications API ───────────── */
+
+export interface ApiNotification {
+	id: string;
+	type: string;
+	message: string;
+	isRead: boolean;
+	createdAt: string;
+}
+
+interface GetNotificationsResponse {
+	status: string;
+	message: string;
+	data: {
+		count: number;
+		results: ApiNotification[];
+	};
+}
+
+export function getNotifications() {
+	return apiFetch<GetNotificationsResponse>("/api/v1/notifications");
+}
+
+export function markNotificationRead(id: string) {
+	return apiFetch<{ status: string; message: string }>(
+		`/api/v1/notifications/${encodeURIComponent(id)}/read`,
+		{ method: "PATCH" },
+	);
+}
+
+export function markAllNotificationsRead() {
+	return apiFetch<{ status: string; message: string }>(
+		"/api/v1/notifications/read-all",
+		{ method: "PATCH" },
+	);
+}
+
+export function deleteNotification(id: string) {
+	return apiFetch<{ status: string; message: string }>(
+		`/api/v1/notifications/${encodeURIComponent(id)}`,
+		{ method: "DELETE" },
+	);
+}
+
+/* ───────────── Chat API ───────────── */
+
+export interface ApiConversation {
+	partnerId: string;
+	lastMessage: string;
+	lastMessageType: string;
+	lastMessageAt: string;
+	lastMessageFrom: string;
+}
+
+interface GetConversationsResponse {
+	status: string;
+	data: ApiConversation[];
+}
+
+export function getConversations() {
+	return apiFetch<GetConversationsResponse>("/api/v1/chat/conversations");
+}
+
+export interface ApiChatMessage {
+	type: string;
+	from: string;
+	to: string;
+	content: string;
+	sentAt: string;
+}
+
+interface GetConversationMessagesResponse {
+	status: string;
+	data: ApiChatMessage[];
+}
+
+export function getConversationMessages(userId: string, limit = 100) {
+	return apiFetch<GetConversationMessagesResponse>(
+		`/api/v1/chat/conversations/${encodeURIComponent(userId)}?limit=${limit}`,
+	);
+}

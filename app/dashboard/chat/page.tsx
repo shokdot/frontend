@@ -1,6 +1,19 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useChat, type ChatMessage } from "../../components/ChatProvider";
+import { useLiveStatus, type UserStatus } from "../../components/StatusProvider";
+import {
+  getConversations,
+  getConversationMessages,
+  getUserById,
+  getMyProfile,
+  searchUsers,
+  listFriends,
+  type ApiConversation,
+  type ApiChatMessage,
+  type ApiUserProfile,
+} from "@/lib/api";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -17,17 +30,6 @@ function SendIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
       <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-    </svg>
-  );
-}
-
-function HashIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <line x1="4" y1="9" x2="20" y2="9" />
-      <line x1="4" y1="15" x2="20" y2="15" />
-      <line x1="10" y1="3" x2="8" y2="21" />
-      <line x1="16" y1="3" x2="14" y2="21" />
     </svg>
   );
 }
@@ -63,17 +65,6 @@ function GamepadIcon({ className }: { className?: string }) {
   );
 }
 
-function UserPlusIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-      <circle cx="8.5" cy="7" r="4" />
-      <line x1="20" y1="8" x2="20" y2="14" />
-      <line x1="23" y1="11" x2="17" y2="11" />
-    </svg>
-  );
-}
-
 function ChevronLeftIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -92,22 +83,39 @@ function EllipsisIcon({ className }: { className?: string }) {
   );
 }
 
-/* ──────────────────────── Types ──────────────────────── */
-
-type Status = "online" | "in-game" | "idle" | "offline";
-
-interface Conversation {
-  id: string;
-  type: "dm" | "channel";
-  name: string;
-  avatar: string;
-  status?: Status;
-  lastMessage: string;
-  lastTime: string;
-  unread: number;
+function PenSquareIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
 }
 
-interface Message {
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+/* ──────────────────────── Types ──────────────────────── */
+
+type Status = UserStatus;
+
+interface ConversationDisplay {
+  partnerId: string;
+  name: string;
+  avatar: string;
+  avatarUrl: string | null;
+  status: Status;
+  lastMessage: string;
+  lastTime: string;
+}
+
+interface MessageDisplay {
   id: string;
   sender: string;
   avatar: string;
@@ -115,63 +123,6 @@ interface Message {
   time: string;
   isOwn: boolean;
 }
-
-/* ──────────────────────── Mock Data ──────────────────────── */
-
-const conversations: Conversation[] = [
-  { id: "1", type: "dm", name: "NeonBlade42", avatar: "NB", status: "online", lastMessage: "gg! rematch?", lastTime: "2m", unread: 2 },
-  { id: "2", type: "dm", name: "PixelStorm", avatar: "PS", status: "in-game", lastMessage: "Nice one, that was close", lastTime: "15m", unread: 0 },
-  { id: "3", type: "dm", name: "CyberPaddle", avatar: "CP", status: "online", lastMessage: "I'll be on later tonight", lastTime: "1h", unread: 1 },
-  { id: "4", type: "channel", name: "general", avatar: "#", status: undefined, lastMessage: "RetroWave: anyone up for a game?", lastTime: "5m", unread: 4 },
-  { id: "5", type: "channel", name: "tournaments", avatar: "#", status: undefined, lastMessage: "ArcadeKing: neon cup starts at 8pm", lastTime: "30m", unread: 0 },
-  { id: "6", type: "dm", name: "ArcadeKing", avatar: "AK", status: "idle", lastMessage: "Sure, let me know when", lastTime: "3h", unread: 0 },
-  { id: "7", type: "dm", name: "RetroWave", avatar: "RW", status: "online", lastMessage: "That serve was insane lol", lastTime: "5h", unread: 0 },
-  { id: "8", type: "channel", name: "strategy", avatar: "#", status: undefined, lastMessage: "VoltServe: try angling your paddle more", lastTime: "1d", unread: 0 },
-  { id: "9", type: "dm", name: "QuantumServe", avatar: "QS", status: "offline", lastMessage: "Thanks for the tips!", lastTime: "2d", unread: 0 },
-];
-
-const messagesByConversation: Record<string, Message[]> = {
-  "1": [
-    { id: "m1", sender: "NeonBlade42", avatar: "NB", content: "Hey, nice match earlier!", time: "10:30 AM", isOwn: false },
-    { id: "m2", sender: "You", avatar: "U", content: "Thanks! You almost had me at the end there", time: "10:31 AM", isOwn: true },
-    { id: "m3", sender: "NeonBlade42", avatar: "NB", content: "That last serve was crazy. How do you do that spin?", time: "10:32 AM", isOwn: false },
-    { id: "m4", sender: "You", avatar: "U", content: "It's all about the angle and timing. Hit the edge of the paddle right when the ball arrives", time: "10:33 AM", isOwn: true },
-    { id: "m5", sender: "NeonBlade42", avatar: "NB", content: "I need to practice that. Wanna go again?", time: "10:34 AM", isOwn: false },
-    { id: "m6", sender: "You", avatar: "U", content: "Sure, give me 5 minutes", time: "10:35 AM", isOwn: true },
-    { id: "m7", sender: "NeonBlade42", avatar: "NB", content: "gg! rematch?", time: "10:52 AM", isOwn: false },
-  ],
-  "2": [
-    { id: "m1", sender: "PixelStorm", avatar: "PS", content: "That game was intense", time: "9:15 AM", isOwn: false },
-    { id: "m2", sender: "You", avatar: "U", content: "Yeah I thought I was done for at 9-10", time: "9:16 AM", isOwn: true },
-    { id: "m3", sender: "PixelStorm", avatar: "PS", content: "Nice one, that was close", time: "9:17 AM", isOwn: false },
-  ],
-  "3": [
-    { id: "m1", sender: "You", avatar: "U", content: "Hey, wanna play tonight?", time: "8:00 AM", isOwn: true },
-    { id: "m2", sender: "CyberPaddle", avatar: "CP", content: "I'll be on later tonight", time: "8:45 AM", isOwn: false },
-  ],
-  "4": [
-    { id: "m1", sender: "ArcadeKing", avatar: "AK", content: "Morning everyone!", time: "8:00 AM", isOwn: false },
-    { id: "m2", sender: "PixelStorm", avatar: "PS", content: "Hey! Anyone want to warm up?", time: "8:05 AM", isOwn: false },
-    { id: "m3", sender: "You", avatar: "U", content: "I'm in, just finished breakfast", time: "8:10 AM", isOwn: true },
-    { id: "m4", sender: "NeonBlade42", avatar: "NB", content: "Count me in too!", time: "8:12 AM", isOwn: false },
-    { id: "m5", sender: "RetroWave", avatar: "RW", content: "anyone up for a game?", time: "10:48 AM", isOwn: false },
-  ],
-  "5": [
-    { id: "m1", sender: "ArcadeKing", avatar: "AK", content: "neon cup starts at 8pm", time: "10:22 AM", isOwn: false },
-  ],
-  "6": [
-    { id: "m1", sender: "ArcadeKing", avatar: "AK", content: "Sure, let me know when", time: "7:00 AM", isOwn: false },
-  ],
-  "7": [
-    { id: "m1", sender: "RetroWave", avatar: "RW", content: "That serve was insane lol", time: "5:30 PM", isOwn: false },
-  ],
-  "8": [
-    { id: "m1", sender: "VoltServe", avatar: "VS", content: "try angling your paddle more", time: "Yesterday", isOwn: false },
-  ],
-  "9": [
-    { id: "m1", sender: "QuantumServe", avatar: "QS", content: "Thanks for the tips!", time: "2 days ago", isOwn: false },
-  ],
-};
 
 /* ──────────────────────── Status Helpers ──────────────────────── */
 
@@ -189,6 +140,37 @@ const statusLabels: Record<Status, string> = {
   offline: "Offline",
 };
 
+function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function formatTime(isoString: string): string {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "now";
+  if (diffMins < 60) return `${diffMins}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+function formatMessageTime(isoString: string): string {
+  return new Date(isoString).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /* ──────────────────────── Conversation Item ──────────────────────── */
 
 function ConversationItem({
@@ -196,7 +178,7 @@ function ConversationItem({
   isActive,
   onClick,
 }: {
-  convo: Conversation;
+  convo: ConversationDisplay;
   isActive: boolean;
   onClick: () => void;
 }) {
@@ -211,10 +193,12 @@ function ConversationItem({
     >
       {/* Avatar */}
       <div className="relative flex-shrink-0">
-        {convo.type === "channel" ? (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-lighter text-sm font-bold text-zinc-400">
-            <HashIcon className="h-4 w-4" />
-          </div>
+        {convo.avatarUrl ? (
+          <img
+            src={convo.avatarUrl}
+            alt={convo.name}
+            className="h-9 w-9 rounded-full object-cover"
+          />
         ) : (
           <div className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${
             isActive ? "bg-accent/20 text-accent-light" : "bg-white/5 text-zinc-400"
@@ -222,35 +206,26 @@ function ConversationItem({
             {convo.avatar}
           </div>
         )}
-        {convo.status && (
-          <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface-light ${statusColors[convo.status]}`} />
-        )}
+        <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface-light ${statusColors[convo.status]}`} />
       </div>
 
       {/* Info */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <p className={`truncate text-sm font-medium ${isActive ? "text-accent-light" : "text-zinc-200"}`}>
-            {convo.type === "channel" ? `# ${convo.name}` : convo.name}
+            {convo.name}
           </p>
           <span className="flex-shrink-0 text-[11px] text-zinc-600">{convo.lastTime}</span>
         </div>
         <p className="mt-0.5 truncate text-xs text-zinc-500">{convo.lastMessage}</p>
       </div>
-
-      {/* Unread badge */}
-      {convo.unread > 0 && (
-        <span className="flex h-5 min-w-5 flex-shrink-0 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold text-white shadow-[0_0_8px_rgba(139,92,246,0.5)]">
-          {convo.unread}
-        </span>
-      )}
     </button>
   );
 }
 
 /* ──────────────────────── Message Bubble ──────────────────────── */
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message }: { message: MessageDisplay }) {
   if (message.isOwn) {
     return (
       <div className="flex justify-end gap-2">
@@ -280,56 +255,518 @@ function MessageBubble({ message }: { message: Message }) {
   );
 }
 
+/* ──────────────────────── Empty State ──────────────────────── */
+
+function EmptyState() {
+  return (
+    <div className="flex flex-1 items-center justify-center">
+      <div className="flex flex-col items-center text-center">
+        <ChatBubbleIcon className="mb-3 h-10 w-10 text-zinc-600" />
+        <p className="text-sm font-medium text-zinc-400">No conversations yet</p>
+        <p className="mt-1 text-xs text-zinc-600">
+          Send a message to a friend to start chatting
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────── Live Status Wrapper ──────────────────────── */
+
+function ConversationItemWithStatus({
+  convo,
+  isActive,
+  onClick,
+}: {
+  convo: ConversationDisplay;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const liveStatus = useLiveStatus(convo.partnerId, convo.status);
+  return (
+    <ConversationItem
+      convo={{ ...convo, status: liveStatus }}
+      isActive={isActive}
+      onClick={onClick}
+    />
+  );
+}
+
+/* ──────────────────────── New Message Modal ──────────────────────── */
+
+function NewMessageModal({
+  onSelect,
+  onClose,
+  existingPartnerIds,
+}: {
+  onSelect: (user: ApiUserProfile) => void;
+  onClose: () => void;
+  existingPartnerIds: Set<string>;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<{ userId: string; username: string; avatarUrl: string | null }[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+
+  // Load friends as default suggestions
+  useEffect(() => {
+    listFriends("accepted")
+      .then((res) => {
+        setResults(
+          res.data.friends.map((f) => ({
+            userId: f.userId,
+            username: f.username,
+            avatarUrl: f.avatarUrl,
+          })),
+        );
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, []);
+
+  // Focus input on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  function handleSearch(value: string) {
+    setQuery(value);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (!value.trim()) {
+      // Reset to friends list
+      listFriends("accepted")
+        .then((res) =>
+          setResults(
+            res.data.friends.map((f) => ({
+              userId: f.userId,
+              username: f.username,
+              avatarUrl: f.avatarUrl,
+            })),
+          ),
+        )
+        .catch(() => {});
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await searchUsers(value.trim());
+        setResults(
+          res.data.results.map((u) => ({
+            userId: u.userId,
+            username: u.username,
+            avatarUrl: u.avatarUrl,
+          })),
+        );
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+  }
+
+  async function handleSelect(user: { userId: string; username: string; avatarUrl: string | null }) {
+    try {
+      const res = await getUserById(user.userId);
+      onSelect(res.data);
+    } catch {
+      // Fallback with what we have
+      onSelect({
+        userId: user.userId,
+        username: user.username,
+        displayName: null,
+        bio: null,
+        avatarUrl: user.avatarUrl,
+        createdAt: "",
+        updatedAt: "",
+      });
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-surface-light shadow-2xl shadow-accent/10"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+          <h3 className="text-sm font-semibold text-white">New Message</h3>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-5 py-3">
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder="Search by username..."
+              value={query}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="w-full rounded-lg border border-white/5 bg-surface-lighter py-2 pl-9 pr-3 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+            />
+          </div>
+        </div>
+
+        {/* Results */}
+        <div className="max-h-72 overflow-y-auto px-3 pb-3">
+          {!loaded || searching ? (
+            <div className="flex justify-center py-6">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+            </div>
+          ) : results.length > 0 ? (
+            <div className="space-y-0.5">
+              {!query.trim() && (
+                <p className="px-2 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
+                  Friends
+                </p>
+              )}
+              {results.map((user) => {
+                const hasConvo = existingPartnerIds.has(user.userId);
+                return (
+                  <button
+                    key={user.userId}
+                    onClick={() => handleSelect(user)}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all hover:bg-white/5"
+                  >
+                    {user.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.username}
+                        className="h-9 w-9 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-xs font-bold text-zinc-400">
+                        {getInitials(user.username)}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-zinc-200">{user.username}</p>
+                    </div>
+                    {hasConvo && (
+                      <span className="flex-shrink-0 text-[10px] font-medium text-accent-light">Open</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center py-8 text-center">
+              <SearchIcon className="mb-2 h-5 w-5 text-zinc-600" />
+              <p className="text-sm text-zinc-500">No users found</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ──────────────────────── Page ──────────────────────── */
 
 export default function ChatPage() {
-  const [activeConvo, setActiveConvo] = useState("1");
+  const { sendMessage, incomingMessages } = useChat();
+
+  // State
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationDisplay[]>([]);
+  const [activeConvo, setActiveConvo] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [messageInput, setMessageInput] = useState("");
-  const [localMessages, setLocalMessages] = useState<Record<string, Message[]>>(messagesByConversation);
+  const [messages, setMessages] = useState<MessageDisplay[]>([]);
   const [mobileShowChat, setMobileShowChat] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [showNewMessage, setShowNewMessage] = useState(false);
 
-  const activeConversation = conversations.find((c) => c.id === activeConvo)!;
-  const messages = localMessages[activeConvo] || [];
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const profileCache = useRef<Map<string, ApiUserProfile>>(new Map());
+  const lastIncomingCount = useRef(0);
+
+  // Fetch user profile with cache
+  const fetchProfile = useCallback(async (userId: string): Promise<ApiUserProfile | null> => {
+    if (profileCache.current.has(userId)) {
+      return profileCache.current.get(userId)!;
+    }
+    try {
+      const res = await getUserById(userId);
+      profileCache.current.set(userId, res.data);
+      return res.data;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Load my profile
+  useEffect(() => {
+    getMyProfile()
+      .then((res) => setMyUserId(res.data.userId))
+      .catch(() => {});
+  }, []);
+
+  // Load conversation list
+  const loadConversations = useCallback(async () => {
+    try {
+      const res = await getConversations();
+      const convos: ConversationDisplay[] = [];
+
+      for (const c of res.data) {
+        const profile = await fetchProfile(c.partnerId);
+        const name = profile?.displayName || profile?.username || c.partnerId.slice(0, 8);
+        convos.push({
+          partnerId: c.partnerId,
+          name,
+          avatar: getInitials(name),
+          avatarUrl: profile?.avatarUrl ?? null,
+          status: "offline",
+          lastMessage: c.lastMessage,
+          lastTime: formatTime(c.lastMessageAt),
+        });
+      }
+
+      setConversations(convos);
+      if (convos.length > 0 && !activeConvo) {
+        setActiveConvo(convos[0].partnerId);
+      }
+    } catch {
+      // Silently fail - user may have no conversations
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchProfile, activeConvo]);
+
+  useEffect(() => {
+    if (myUserId) {
+      loadConversations();
+    }
+  }, [myUserId, loadConversations]);
+
+  // Load messages for active conversation
+  useEffect(() => {
+    if (!activeConvo || !myUserId) return;
+
+    let cancelled = false;
+    setLoadingMessages(true);
+
+    (async () => {
+      try {
+        const res = await getConversationMessages(activeConvo);
+        if (cancelled) return;
+
+        const profile = await fetchProfile(activeConvo);
+        const partnerName = profile?.displayName || profile?.username || activeConvo.slice(0, 8);
+        const partnerAvatar = getInitials(partnerName);
+
+        const displayMessages: MessageDisplay[] = res.data
+          .filter((m) => m.type === "CHAT")
+          .map((m, i) => ({
+            id: `${m.sentAt}-${i}`,
+            sender: m.from === myUserId ? "You" : partnerName,
+            avatar: m.from === myUserId ? "U" : partnerAvatar,
+            content: m.content,
+            time: formatMessageTime(m.sentAt),
+            isOwn: m.from === myUserId,
+          }));
+
+        setMessages(displayMessages);
+      } catch {
+        setMessages([]);
+      } finally {
+        if (!cancelled) setLoadingMessages(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [activeConvo, myUserId, fetchProfile]);
+
+  // Handle real-time incoming messages
+  useEffect(() => {
+    if (!myUserId) return;
+
+    const newMessages = incomingMessages.slice(lastIncomingCount.current);
+    lastIncomingCount.current = incomingMessages.length;
+
+    if (newMessages.length === 0) return;
+
+    for (const msg of newMessages) {
+      const partnerId = msg.from;
+
+      // Update conversation list
+      setConversations((prev) => {
+        const existing = prev.find((c) => c.partnerId === partnerId);
+        if (existing) {
+          const updated = prev.map((c) =>
+            c.partnerId === partnerId
+              ? { ...c, lastMessage: msg.content, lastTime: formatTime(msg.sentAt) }
+              : c,
+          );
+          // Move to top
+          const target = updated.find((c) => c.partnerId === partnerId)!;
+          return [target, ...updated.filter((c) => c.partnerId !== partnerId)];
+        }
+
+        // New conversation partner - add with placeholder, profile will be fetched
+        const name = partnerId.slice(0, 8);
+        const newConvo: ConversationDisplay = {
+          partnerId,
+          name,
+          avatar: getInitials(name),
+          avatarUrl: null,
+          status: "offline",
+          lastMessage: msg.content,
+          lastTime: formatTime(msg.sentAt),
+        };
+
+        // Fetch profile in background to update name
+        fetchProfile(partnerId).then((profile) => {
+          if (profile) {
+            setConversations((current) =>
+              current.map((c) =>
+                c.partnerId === partnerId
+                  ? {
+                      ...c,
+                      name: profile.displayName || profile.username || c.name,
+                      avatar: getInitials(profile.displayName || profile.username || c.name),
+                      avatarUrl: profile.avatarUrl ?? null,
+                    }
+                  : c,
+              ),
+            );
+          }
+        });
+
+        return [newConvo, ...prev];
+      });
+
+      // If the message is for the active conversation, add it to messages
+      if (partnerId === activeConvo) {
+        const partnerProfile = profileCache.current.get(partnerId);
+        const partnerName = partnerProfile?.displayName || partnerProfile?.username || partnerId.slice(0, 8);
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `rt-${msg.sentAt}-${Date.now()}`,
+            sender: partnerName,
+            avatar: getInitials(partnerName),
+            content: msg.content,
+            time: formatMessageTime(msg.sentAt),
+            isOwn: false,
+          },
+        ]);
+      }
+    }
+  }, [incomingMessages, myUserId, activeConvo, fetchProfile]);
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  const activeConversation = conversations.find((c) => c.partnerId === activeConvo);
 
   const filteredConversations = search.trim()
     ? conversations.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()))
     : conversations;
 
-  const channels = filteredConversations.filter((c) => c.type === "channel");
-  const dms = filteredConversations.filter((c) => c.type === "dm");
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, activeConvo]);
-
   function handleSend(e: React.FormEvent) {
     e.preventDefault();
-    if (!messageInput.trim()) return;
+    if (!messageInput.trim() || !activeConvo || !myUserId) return;
 
-    const newMsg: Message = {
-      id: `own-${Date.now()}`,
-      sender: "You",
-      avatar: "U",
-      content: messageInput.trim(),
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isOwn: true,
-    };
+    const content = messageInput.trim();
+    const sentAt = new Date().toISOString();
 
-    setLocalMessages((prev) => ({
+    // Send via WebSocket
+    sendMessage(activeConvo, content);
+
+    // Add to local messages immediately (optimistic)
+    setMessages((prev) => [
       ...prev,
-      [activeConvo]: [...(prev[activeConvo] || []), newMsg],
-    }));
+      {
+        id: `own-${Date.now()}`,
+        sender: "You",
+        avatar: "U",
+        content,
+        time: formatMessageTime(sentAt),
+        isOwn: true,
+      },
+    ]);
+
+    // Update conversation list
+    setConversations((prev) => {
+      const updated = prev.map((c) =>
+        c.partnerId === activeConvo
+          ? { ...c, lastMessage: content, lastTime: formatTime(sentAt) }
+          : c,
+      );
+      const target = updated.find((c) => c.partnerId === activeConvo);
+      if (target) {
+        return [target, ...updated.filter((c) => c.partnerId !== activeConvo)];
+      }
+      return updated;
+    });
+
     setMessageInput("");
   }
 
-  function handleConvoSelect(id: string) {
-    setActiveConvo(id);
+  function handleConvoSelect(partnerId: string) {
+    setActiveConvo(partnerId);
     setMobileShowChat(true);
   }
 
-  const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
+  function handleNewConversation(profile: ApiUserProfile) {
+    setShowNewMessage(false);
+    const existing = conversations.find((c) => c.partnerId === profile.userId);
+
+    if (existing) {
+      // Open existing conversation
+      setActiveConvo(profile.userId);
+      setMobileShowChat(true);
+      return;
+    }
+
+    // Create new conversation entry in the list
+    const name = profile.displayName || profile.username || profile.userId.slice(0, 8);
+    const newConvo: ConversationDisplay = {
+      partnerId: profile.userId,
+      name,
+      avatar: getInitials(name),
+      avatarUrl: profile.avatarUrl ?? null,
+      status: "offline",
+      lastMessage: "",
+      lastTime: "",
+    };
+
+    profileCache.current.set(profile.userId, profile);
+    setConversations((prev) => [newConvo, ...prev]);
+    setActiveConvo(profile.userId);
+    setMessages([]);
+    setMobileShowChat(true);
+  }
+
+  const existingPartnerIds = new Set(conversations.map((c) => c.partnerId));
+
+  if (loading) {
+    return (
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex h-[calc(100vh-4rem)] flex-col overflow-hidden">
@@ -349,14 +786,13 @@ export default function ChatPage() {
             <div className="flex items-center gap-2">
               <ChatBubbleIcon className="h-5 w-5 text-accent-light" />
               <h2 className="text-sm font-semibold text-white">Messages</h2>
-              {totalUnread > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent/15 px-1.5 text-[10px] font-bold text-accent-light">
-                  {totalUnread}
-                </span>
-              )}
             </div>
-            <button className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white">
-              <UserPlusIcon className="h-4.5 w-4.5" />
+            <button
+              onClick={() => setShowNewMessage(true)}
+              className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-white/5 hover:text-accent-light"
+              title="New message"
+            >
+              <PenSquareIcon className="h-4 w-4" />
             </button>
           </div>
 
@@ -376,41 +812,20 @@ export default function ChatPage() {
 
           {/* Conversation list */}
           <div className="flex-1 overflow-y-auto px-2 pb-2">
-            {/* Channels */}
-            {channels.length > 0 && (
-              <div className="mb-1">
-                <p className="mb-1 px-2 pt-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
-                  Channels
-                </p>
-                {channels.map((convo) => (
-                  <ConversationItem
-                    key={convo.id}
+            {filteredConversations.length > 0 ? (
+              <div className="pt-1">
+                {filteredConversations.map((convo) => (
+                  <ConversationItemWithStatus
+                    key={convo.partnerId}
                     convo={convo}
-                    isActive={activeConvo === convo.id}
-                    onClick={() => handleConvoSelect(convo.id)}
+                    isActive={activeConvo === convo.partnerId}
+                    onClick={() => handleConvoSelect(convo.partnerId)}
                   />
                 ))}
               </div>
-            )}
-
-            {/* Direct messages */}
-            {dms.length > 0 && (
-              <div>
-                <p className="mb-1 px-2 pt-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">
-                  Direct Messages
-                </p>
-                {dms.map((convo) => (
-                  <ConversationItem
-                    key={convo.id}
-                    convo={convo}
-                    isActive={activeConvo === convo.id}
-                    onClick={() => handleConvoSelect(convo.id)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {filteredConversations.length === 0 && (
+            ) : conversations.length === 0 ? (
+              <EmptyState />
+            ) : (
               <div className="flex flex-col items-center py-12 text-center">
                 <SearchIcon className="mb-2 h-5 w-5 text-zinc-600" />
                 <p className="text-sm text-zinc-500">No conversations found</p>
@@ -425,120 +840,175 @@ export default function ChatPage() {
             mobileShowChat ? "flex" : "hidden md:flex"
           }`}
         >
-          {/* Chat header */}
-          <div className="flex items-center justify-between border-b border-white/5 bg-surface-light/30 px-4 py-3 backdrop-blur-sm">
-            <div className="flex items-center gap-3">
-              {/* Mobile back */}
-              <button
-                onClick={() => setMobileShowChat(false)}
-                className="rounded-lg p-1 text-zinc-400 hover:text-white md:hidden"
-              >
-                <ChevronLeftIcon className="h-5 w-5" />
-              </button>
-
-              {/* Avatar */}
-              {activeConversation.type === "channel" ? (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-lighter text-sm font-bold text-zinc-400">
-                  <HashIcon className="h-4 w-4" />
-                </div>
-              ) : (
-                <div className="relative">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/20 text-xs font-bold text-accent-light">
-                    {activeConversation.avatar}
-                  </div>
-                  {activeConversation.status && (
-                    <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface-light ${statusColors[activeConversation.status]}`} />
-                  )}
-                </div>
-              )}
-
-              {/* Name & status */}
-              <div>
-                <p className="text-sm font-semibold text-white">
-                  {activeConversation.type === "channel" ? `# ${activeConversation.name}` : activeConversation.name}
-                </p>
-                {activeConversation.status && (
-                  <p className="text-[11px] text-zinc-500">
-                    {statusLabels[activeConversation.status]}
-                  </p>
-                )}
-                {activeConversation.type === "channel" && (
-                  <p className="text-[11px] text-zinc-500">
-                    {conversations.filter((c) => c.type === "dm").length} members
-                  </p>
-                )}
+          {activeConversation ? (
+            <ChatArea
+              conversation={activeConversation}
+              messages={messages}
+              messageInput={messageInput}
+              loadingMessages={loadingMessages}
+              messagesEndRef={messagesEndRef}
+              onBack={() => setMobileShowChat(false)}
+              onInputChange={setMessageInput}
+              onSend={handleSend}
+            />
+          ) : (
+            <div className="flex flex-1 items-center justify-center">
+              <div className="flex flex-col items-center text-center">
+                <ChatBubbleIcon className="mb-3 h-10 w-10 text-zinc-600" />
+                <p className="text-sm font-medium text-zinc-400">Select a conversation</p>
               </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-1">
-              {activeConversation.type === "dm" && activeConversation.status === "online" && (
-                <button className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-neon-cyan" title="Invite to game">
-                  <GamepadIcon className="h-4 w-4" />
-                </button>
-              )}
-              <button className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" title="Members">
-                <UsersIcon className="h-4 w-4" />
-              </button>
-              <button className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" title="More">
-                <EllipsisIcon className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-            <div className="mx-auto max-w-2xl space-y-4">
-              {/* Conversation start */}
-              <div className="flex flex-col items-center pb-4 pt-2 text-center">
-                {activeConversation.type === "channel" ? (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-lighter">
-                    <HashIcon className="h-6 w-6 text-zinc-400" />
-                  </div>
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/20 text-lg font-bold text-accent-light ring-2 ring-accent/20">
-                    {activeConversation.avatar}
-                  </div>
-                )}
-                <p className="mt-2 text-sm font-semibold text-white">
-                  {activeConversation.type === "channel" ? `# ${activeConversation.name}` : activeConversation.name}
-                </p>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  {activeConversation.type === "channel"
-                    ? "This is the beginning of the channel."
-                    : "This is the beginning of your conversation."}
-                </p>
-              </div>
-
-              {/* Messages */}
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-
-          {/* Message input */}
-          <div className="border-t border-white/5 bg-surface-light/30 px-4 py-3 backdrop-blur-sm sm:px-6">
-            <form onSubmit={handleSend} className="mx-auto flex max-w-2xl items-center gap-2">
-              <input
-                type="text"
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                placeholder={`Message ${activeConversation.type === "channel" ? `#${activeConversation.name}` : activeConversation.name}...`}
-                className="flex-1 rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
-              />
-              <button
-                type="submit"
-                disabled={!messageInput.trim()}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent text-white shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
-              >
-                <SendIcon className="h-4 w-4" />
-              </button>
-            </form>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* New message modal */}
+      {showNewMessage && (
+        <NewMessageModal
+          onSelect={handleNewConversation}
+          onClose={() => setShowNewMessage(false)}
+          existingPartnerIds={existingPartnerIds}
+        />
+      )}
     </div>
+  );
+}
+
+/* ──────────────────────── Chat Area Component ──────────────────────── */
+
+function ChatArea({
+  conversation,
+  messages,
+  messageInput,
+  loadingMessages,
+  messagesEndRef,
+  onBack,
+  onInputChange,
+  onSend,
+}: {
+  conversation: ConversationDisplay;
+  messages: MessageDisplay[];
+  messageInput: string;
+  loadingMessages: boolean;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  onBack: () => void;
+  onInputChange: (val: string) => void;
+  onSend: (e: React.FormEvent) => void;
+}) {
+  const liveStatus = useLiveStatus(conversation.partnerId, conversation.status);
+
+  return (
+    <>
+      {/* Chat header */}
+      <div className="flex items-center justify-between border-b border-white/5 bg-surface-light/30 px-4 py-3 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          {/* Mobile back */}
+          <button
+            onClick={onBack}
+            className="rounded-lg p-1 text-zinc-400 hover:text-white md:hidden"
+          >
+            <ChevronLeftIcon className="h-5 w-5" />
+          </button>
+
+          {/* Avatar */}
+          <div className="relative">
+            {conversation.avatarUrl ? (
+              <img
+                src={conversation.avatarUrl}
+                alt={conversation.name}
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/20 text-xs font-bold text-accent-light">
+                {conversation.avatar}
+              </div>
+            )}
+            <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface-light ${statusColors[liveStatus]}`} />
+          </div>
+
+          {/* Name & status */}
+          <div>
+            <p className="text-sm font-semibold text-white">
+              {conversation.name}
+            </p>
+            <p className="text-[11px] text-zinc-500">
+              {statusLabels[liveStatus]}
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1">
+          {liveStatus === "online" && (
+            <button className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-neon-cyan" title="Invite to game">
+              <GamepadIcon className="h-4 w-4" />
+            </button>
+          )}
+          <button className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" title="Members">
+            <UsersIcon className="h-4 w-4" />
+          </button>
+          <button className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" title="More">
+            <EllipsisIcon className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+        <div className="mx-auto max-w-2xl space-y-4">
+          {/* Conversation start */}
+          <div className="flex flex-col items-center pb-4 pt-2 text-center">
+            {conversation.avatarUrl ? (
+              <img
+                src={conversation.avatarUrl}
+                alt={conversation.name}
+                className="h-12 w-12 rounded-full object-cover ring-2 ring-accent/20"
+              />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent/20 text-lg font-bold text-accent-light ring-2 ring-accent/20">
+                {conversation.avatar}
+              </div>
+            )}
+            <p className="mt-2 text-sm font-semibold text-white">
+              {conversation.name}
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              This is the beginning of your conversation.
+            </p>
+          </div>
+
+          {loadingMessages ? (
+            <div className="flex justify-center py-8">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <MessageBubble key={msg.id} message={msg} />
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* Message input */}
+      <div className="border-t border-white/5 bg-surface-light/30 px-4 py-3 backdrop-blur-sm sm:px-6">
+        <form onSubmit={onSend} className="mx-auto flex max-w-2xl items-center gap-2">
+          <input
+            type="text"
+            value={messageInput}
+            onChange={(e) => onInputChange(e.target.value)}
+            placeholder={`Message ${conversation.name}...`}
+            className="flex-1 rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+          />
+          <button
+            type="submit"
+            disabled={!messageInput.trim()}
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent text-white shadow-[0_0_15px_rgba(139,92,246,0.3)] transition-all hover:shadow-[0_0_25px_rgba(139,92,246,0.5)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+          >
+            <SendIcon className="h-4 w-4" />
+          </button>
+        </form>
+      </div>
+    </>
   );
 }

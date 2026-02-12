@@ -19,6 +19,7 @@ import {
 	ApiPlayerRank,
 	ApiMatch,
 } from "@/lib/api";
+import { useLiveStatus } from "../../../components/StatusProvider";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -121,6 +122,9 @@ export default function PlayerPage({
 	const [matches, setMatches] = useState<(ApiMatch & { opponentName?: string })[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+
+	// Live status from WebSocket (called unconditionally per hook rules)
+	const playerStatus = useLiveStatus(profile?.userId, (profile as any)?.status ?? "offline");
 
 	/* ── Friend state ── */
 	type FriendStatus = "none" | "pending_outgoing" | "pending_incoming" | "accepted" | "self";
@@ -304,7 +308,6 @@ export default function PlayerPage({
 	const losses = stats?.losses ?? 0;
 	const totalMatches = wins + losses + (stats?.draws ?? 0);
 	const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 1000) / 10 : 0;
-	const playerStatus = (profile.status ?? "offline") as Status;
 
 	return (
 		<div className="relative">

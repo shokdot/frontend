@@ -14,6 +14,7 @@ import {
 	type ApiBlockedUser,
 	ApiError,
 } from "@/lib/api";
+import { useStatusMap, mapBackendStatus } from "../../components/StatusProvider";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -151,18 +152,6 @@ interface BlockedUser {
 }
 
 /* ──────────────────────── Helpers ──────────────────────── */
-
-/** Map backend status (ONLINE, OFFLINE, IN_GAME) to frontend status */
-function mapOnlineStatus(backendStatus: string): Status {
-	switch (backendStatus?.toUpperCase()) {
-		case "ONLINE":
-			return "online";
-		case "IN_GAME":
-			return "in-game";
-		default:
-			return "offline";
-	}
-}
 
 /** Generate initials from username */
 function getInitials(username: string): string {
@@ -321,8 +310,8 @@ function PendingCard({
 
 			{/* Direction label */}
 			<span className={`hidden rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-block ${isIncoming
-					? "bg-accent/10 text-accent-light"
-					: "bg-white/5 text-zinc-400"
+				? "bg-accent/10 text-accent-light"
+				: "bg-white/5 text-zinc-400"
 				}`}>
 				{isIncoming ? "Incoming" : "Sent"}
 			</span>
@@ -483,6 +472,7 @@ export default function FriendsPage() {
 	const [activeTab, setActiveTab] = useState<FriendsTab>("all");
 	const [search, setSearch] = useState("");
 	const [showAddModal, setShowAddModal] = useState(false);
+	const liveStatuses = useStatusMap();
 
 	// Data state
 	const [friendsList, setFriendsList] = useState<Friend[]>([]);
@@ -512,7 +502,7 @@ export default function FriendsPage() {
 						username: f.username,
 						avatar: getInitials(f.username),
 						avatarUrl: f.avatarUrl,
-						status: mapOnlineStatus(f.onlineStatus),
+						status: mapBackendStatus(f.onlineStatus),
 					});
 				} else if (f.status === "pending") {
 					pending.push({
@@ -546,12 +536,20 @@ export default function FriendsPage() {
 		fetchData();
 	}, [fetchData]);
 
+	/* ── Apply live statuses from WebSocket ── */
+	const liveFriendsList = useMemo(() => {
+		return friendsList.map((f) => ({
+			...f,
+			status: liveStatuses.get(f.userId) ?? f.status,
+		}));
+	}, [friendsList, liveStatuses]);
+
 	/* ── Derived data ── */
-	const onlineCount = friendsList.filter((f) => f.status !== "offline").length;
+	const onlineCount = liveFriendsList.filter((f) => f.status !== "offline").length;
 	const incomingCount = pendingRequests.filter((r) => r.direction === "incoming").length;
 
 	const filteredFriends = useMemo(() => {
-		let list = [...friendsList];
+		let list = [...liveFriendsList];
 
 		if (activeTab === "online") {
 			list = list.filter((f) => f.status !== "offline");
@@ -564,7 +562,7 @@ export default function FriendsPage() {
 
 		list.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
 		return list;
-	}, [friendsList, activeTab, search]);
+	}, [liveFriendsList, activeTab, search]);
 
 	const filteredPending = useMemo(() => {
 		if (!search.trim()) return pendingRequests;
@@ -622,7 +620,7 @@ export default function FriendsPage() {
 	}
 
 	const tabs: { id: FriendsTab; label: string; count?: number }[] = [
-		{ id: "all", label: "All", count: friendsList.length },
+		{ id: "all", label: "All", count: liveFriendsList.length },
 		{ id: "online", label: "Online", count: onlineCount },
 		{ id: "pending", label: "Pending", count: incomingCount },
 		{ id: "blocked", label: "Blocked", count: blockedUsers.length },
@@ -661,7 +659,7 @@ export default function FriendsPage() {
 							<div>
 								<h1 className="text-2xl font-bold text-white sm:text-3xl">Friends</h1>
 								<p className="mt-0.5 text-sm text-zinc-400">
-									<span className="text-emerald-400 font-medium">{onlineCount}</span> online · {friendsList.length} total
+									<span className="text-emerald-400 font-medium">{onlineCount}</span> online · {liveFriendsList.length} total
 								</p>
 							</div>
 						</div>
@@ -694,15 +692,15 @@ export default function FriendsPage() {
 								key={tab.id}
 								onClick={() => setActiveTab(tab.id)}
 								className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeTab === tab.id
-										? "bg-accent/10 text-accent-light shadow-[inset_0_0_20px_rgba(139,92,246,0.05)]"
-										: "text-zinc-400 hover:text-white"
+									? "bg-accent/10 text-accent-light shadow-[inset_0_0_20px_rgba(139,92,246,0.05)]"
+									: "text-zinc-400 hover:text-white"
 									}`}
 							>
 								{tab.label}
 								{tab.count !== undefined && tab.count > 0 && (
 									<span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${activeTab === tab.id
-											? "bg-accent/20 text-accent-light"
-											: "bg-white/5 text-zinc-500"
+										? "bg-accent/20 text-accent-light"
+										: "bg-white/5 text-zinc-500"
 										}`}>
 										{tab.count}
 									</span>
