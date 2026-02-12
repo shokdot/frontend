@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useChat, type ChatMessage } from "../../components/ChatProvider";
 import { useLiveStatus, mapBackendStatus, type UserStatus } from "../../components/StatusProvider";
 import {
@@ -679,6 +680,7 @@ function NewMessageModal({
 
 export default function ChatPage() {
 	const { sendMessage, incomingMessages, clearUnread, conversationUnreads, clearConversationUnread, setActiveChatPartner } = useChat();
+	const searchParams = useSearchParams();
 
 	// State
 	const [myUserId, setMyUserId] = useState<string | null>(null);
@@ -692,6 +694,7 @@ export default function ChatPage() {
 	const [loadingMessages, setLoadingMessages] = useState(false);
 	const [showNewMessage, setShowNewMessage] = useState(false);
 	const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+	const pendingOpenUserIdRef = useRef<string | null>(searchParams.get("userId"));
 
 	// Clear global unread badge whenever the chat page is active
 	useEffect(() => {
@@ -790,6 +793,52 @@ export default function ChatPage() {
 			loadBlockedUsers();
 		}
 	}, [myUserId, loadConversations, loadBlockedUsers]);
+
+	// Open conversation from URL search param (?userId=xxx)
+	useEffect(() => {
+		const targetUserId = pendingOpenUserIdRef.current;
+		if (!targetUserId || loading || !myUserId) return;
+
+		// Only process once
+		pendingOpenUserIdRef.current = null;
+
+		// Check if there's already a conversation with this user
+		const existing = conversations.find((c) => c.partnerId === targetUserId);
+		if (existing) {
+			setActiveConvo(targetUserId);
+			setMobileShowChat(true);
+			clearConversationUnread(targetUserId);
+			return;
+		}
+
+		// No existing conversation — fetch the user profile and create one
+		(async () => {
+			try {
+				const res = await getUserById(targetUserId);
+				const profile = res.data;
+				const name = profile.displayName || profile.username || profile.userId.slice(0, 8);
+				const newConvo: ConversationDisplay = {
+					partnerId: profile.userId,
+					name,
+					username: profile.username || profile.userId.slice(0, 8),
+					avatar: getInitials(name),
+					avatarUrl: profile.avatarUrl ?? null,
+					status: "offline",
+					lastMessage: "",
+					lastTime: "",
+					unreadCount: 0,
+				};
+
+				profileCache.current.set(profile.userId, profile);
+				setConversations((prev) => [newConvo, ...prev]);
+				setActiveConvo(profile.userId);
+				setMessages([]);
+				setMobileShowChat(true);
+			} catch {
+				// User not found — silently ignore
+			}
+		})();
+	}, [loading, myUserId, conversations, clearConversationUnread]);
 
 	// Deselect active conversation on Escape
 	useEffect(() => {

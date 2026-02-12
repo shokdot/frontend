@@ -9,6 +9,7 @@ import {
 	useState,
 } from "react";
 import { getAccessToken } from "@/lib/auth";
+import { listFriends } from "@/lib/api";
 
 /* ──────────────────────── Types ──────────────────────── */
 
@@ -102,10 +103,37 @@ export default function StatusProvider({
 			wsRef.current.close();
 		}
 
+		// Clear stale statuses — events may have been missed while disconnected
+		setStatuses(new Map());
+
 		const ws = new WebSocket(
 			buildWsUrl("/api/v1/notifications/status/ws", token),
 		);
 		wsRef.current = ws;
+
+		ws.onopen = () => {
+			// Pre-populate the map with current friend statuses so components
+			// don't have to wait for individual change events
+			listFriends("accepted")
+				.then((res) => {
+					const batch = new Map<string, UserStatus>();
+					for (const f of res.data.friends) {
+						batch.set(f.userId, mapBackendStatus(f.onlineStatus));
+					}
+					setStatuses((prev) => {
+						// Merge: any WS updates that arrived during the fetch
+						// take priority over API data (they are more recent)
+						const next = new Map(batch);
+						for (const [k, v] of prev) {
+							next.set(k, v);
+						}
+						return next;
+					});
+				})
+				.catch(() => {
+					// Silently fail — components will use their API fallback
+				});
+		};
 
 		ws.onmessage = (event) => {
 			try {

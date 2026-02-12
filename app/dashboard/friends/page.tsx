@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
 	listFriends,
 	listBlocked,
@@ -227,10 +228,12 @@ function Avatar({
 function FriendCard({
 	friend,
 	onRemove,
+	onMessage,
 	removing,
 }: {
 	friend: Friend;
 	onRemove: (username: string) => void;
+	onMessage: (userId: string) => void;
 	removing: boolean;
 }) {
 	return (
@@ -260,7 +263,7 @@ function FriendCard({
 						<GamepadIcon className="h-4 w-4" />
 					</button>
 				)}
-				<button className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-accent/10 hover:text-accent-light" title="Message">
+				<button onClick={() => onMessage(friend.userId)} className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-accent/10 hover:text-accent-light" title="Message">
 					<ChatIcon className="h-4 w-4" />
 				</button>
 				<button
@@ -478,6 +481,7 @@ function AddFriendModal({
 /* ──────────────────────── Page ──────────────────────── */
 
 export default function FriendsPage() {
+	const router = useRouter();
 	const [activeTab, setActiveTab] = useState<FriendsTab>("all");
 	const [search, setSearch] = useState("");
 	const [showAddModal, setShowAddModal] = useState(false);
@@ -581,6 +585,10 @@ export default function FriendsPage() {
 	}, [pendingRequests, search]);
 
 	/* ── Action handlers ── */
+	function handleMessage(userId: string) {
+		router.push(`/dashboard/chat?userId=${userId}`);
+	}
+
 	async function handleRemoveFriend(username: string) {
 		setBusyUser(username);
 		try {
@@ -745,6 +753,7 @@ export default function FriendsPage() {
 										key={friend.userId}
 										friend={friend}
 										onRemove={handleRemoveFriend}
+										onMessage={handleMessage}
 										removing={busyUser === friend.username}
 									/>
 								))

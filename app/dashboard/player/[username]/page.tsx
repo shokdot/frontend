@@ -507,7 +507,10 @@ export default function PlayerPage({
 											<GamepadIcon className="h-4 w-4" />
 											Invite
 										</button>
-										<button className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-surface-lighter px-4 py-2 text-sm font-medium text-zinc-300 transition-all hover:border-white/20 hover:text-white">
+										<button
+											onClick={() => profile && router.push(`/dashboard/chat?userId=${profile.userId}`)}
+											className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-surface-lighter px-4 py-2 text-sm font-medium text-zinc-300 transition-all hover:border-white/20 hover:text-white"
+										>
 											<ChatIcon className="h-4 w-4" />
 											Message
 										</button>
