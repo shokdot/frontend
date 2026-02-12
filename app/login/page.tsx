@@ -20,8 +20,21 @@ export default function LoginPage() {
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState(() => {
 		const err = searchParams.get("error");
-		if (err === "oauth_failed") return "GitHub sign-in failed. Please try again.";
-		return err ? `Authentication error: ${err}` : "";
+		if (!err) return "";
+
+		const errorMessages: Record<string, string> = {
+			oauth_failed: "GitHub sign-in failed. Please try again.",
+			INTERNAL_SERVER_ERROR: "Something went wrong on our end. Please try again later.",
+			NO_OAUTH_TOKEN: "GitHub authorization was not completed. Please try again.",
+			GITHUB_API_ERROR: "Unable to communicate with GitHub. Please try again later.",
+			NO_GITHUB_USERNAME: "Your GitHub account doesn't have a username set. Please update your GitHub profile and try again.",
+			NO_VERIFIED_EMAIL: "No verified email found on your GitHub account. Please verify your email on GitHub and try again.",
+			USER_SERVICE_ERROR: "Something went wrong while setting up your account. Please try again later.",
+			SESSION_EXPIRED: "Your session has expired. Please sign in again.",
+			UNAUTHORIZED: "You need to sign in to access that page.",
+		};
+
+		return errorMessages[err] || "Something went wrong. Please try again.";
 	});
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
@@ -239,9 +252,9 @@ export default function LoginPage() {
 						<div className="h-px flex-1 bg-white/5" />
 					</div>
 
-					{/* OAuth */}
-					<a
-						href="/api/v1/auth/oauth/github"
+				{/* OAuth */}
+				<a
+					href={`${process.env.NEXT_PUBLIC_OAUTH_URL || ""}/api/v1/auth/oauth/github`}
 						className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-white/10 bg-surface-lighter py-2.5 text-sm font-medium text-zinc-300 transition-all hover:border-neon-cyan/20 hover:text-white hover:shadow-[0_0_15px_rgba(0,240,255,0.08)]"
 					>
 						<svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="currentColor">

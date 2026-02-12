@@ -302,7 +302,7 @@ export default function RegisterPage() {
 
 					{/* OAuth */}
 					<a
-						href="/api/v1/auth/oauth/github"
+						href={`${process.env.NEXT_PUBLIC_OAUTH_URL || ""}/api/v1/auth/oauth/github`}
 						className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-white/10 bg-surface-lighter py-2.5 text-sm font-medium text-zinc-300 transition-all hover:border-neon-cyan/20 hover:text-white hover:shadow-[0_0_15px_rgba(0,240,255,0.08)]"
 					>
 						<svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="currentColor">
