@@ -196,7 +196,7 @@ export default function DashboardLayout({
 	const pathname = usePathname();
 	const router = useRouter();
 	const [sidebarOpen, setSidebarOpen] = useState(false);
-	const { theme, toggleTheme } = useTheme();
+	const { theme, themeReady, toggleTheme } = useTheme();
 	const [searchQuery, setSearchQuery] = useState("");
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [searchResults, setSearchResults] = useState<ApiSearchResult[]>([]);
@@ -288,8 +288,26 @@ export default function DashboardLayout({
 			});
 		} finally {
 			clearAuth();
+			localStorage.removeItem("theme");
+			document.documentElement.setAttribute("data-theme", "dark");
 			window.location.href = "/";
 		}
+	}
+
+	/* ── Loading screen while theme resolves ── */
+	if (!themeReady) {
+		return (
+			<div className="flex min-h-screen items-center justify-center bg-surface">
+				<div className="flex flex-col items-center gap-4">
+					<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent shadow-[0_0_20px_rgba(139,92,246,0.4)]">
+						<svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+							<path d="M8 5v14l11-7z" />
+						</svg>
+					</div>
+					<div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-700 border-t-accent" />
+				</div>
+			</div>
+		);
 	}
 
 	return (

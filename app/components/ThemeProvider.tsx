@@ -8,12 +8,14 @@ type Theme = "dark" | "light";
 
 interface ThemeContextValue {
 	theme: Theme;
+	themeReady: boolean;
 	toggleTheme: () => void;
 	setTheme: (theme: Theme) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
 	theme: "dark",
+	themeReady: false,
 	toggleTheme: () => { },
 	setTheme: () => { },
 });
@@ -25,19 +27,27 @@ export function useTheme() {
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
 	const [theme, setThemeState] = useState<Theme>("dark");
 	const [mounted, setMounted] = useState(false);
+	const [themeReady, setThemeReady] = useState(false);
 	const isUserChange = useRef(false);
 
-	// On mount: use localStorage immediately for fast paint, then sync from API
 	useEffect(() => {
+		const isAuthenticated = !!getAccessToken();
+
+		if (!isAuthenticated) {
+			// Public pages: always dark, ignore localStorage, ready immediately
+			document.documentElement.setAttribute("data-theme", "dark");
+			setThemeState("dark");
+			setMounted(true);
+			setThemeReady(true);
+			return;
+		}
+
+		// Authenticated: read localStorage for fast paint, then sync from API
 		const stored = localStorage.getItem("theme") as Theme | null;
-		const initial = stored ?? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+		const initial = stored ?? "dark";
 		setThemeState(initial);
 		document.documentElement.setAttribute("data-theme", initial);
 		setMounted(true);
-
-		// Only fetch user theme from backend if we have a token (i.e. user is logged in).
-		// This provider lives in the root layout and wraps unauthenticated pages too.
-		if (!getAccessToken()) return;
 
 		getMyProfile()
 			.then((res) => {
@@ -49,7 +59,10 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
 				}
 			})
 			.catch(() => {
-				// Not logged in or network error — keep local theme
+				// Network error — keep local theme
+			})
+			.finally(() => {
+				setThemeReady(true);
 			});
 	}, []);
 
@@ -57,7 +70,11 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
 	useEffect(() => {
 		if (!mounted) return;
 		document.documentElement.setAttribute("data-theme", theme);
-		localStorage.setItem("theme", theme);
+
+		// Only persist to localStorage when authenticated
+		if (getAccessToken()) {
+			localStorage.setItem("theme", theme);
+		}
 
 		if (isUserChange.current) {
 			isUserChange.current = false;
@@ -81,7 +98,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
 	);
 
 	return (
-		<ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
+		<ThemeContext.Provider value={{ theme, themeReady, toggleTheme, setTheme }}>
 			{children}
 		</ThemeContext.Provider>
 	);
