@@ -30,6 +30,12 @@ interface ChatContextValue {
 	unreadCount: number;
 	/** Reset the unread counter (call when the user views the chat page) */
 	clearUnread: () => void;
+	/** Per-conversation unread message counts (persists across chat page navigation) */
+	conversationUnreads: Map<string, number>;
+	/** Clear unread count for a specific conversation */
+	clearConversationUnread: (partnerId: string) => void;
+	/** Tell the provider which conversation is currently being viewed */
+	setActiveChatPartner: (partnerId: string | null) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -61,10 +67,28 @@ export default function ChatProvider({
 	const [incomingMessages, setIncomingMessages] = useState<ChatMessage[]>([]);
 	const [connected, setConnected] = useState(false);
 	const [unreadCount, setUnreadCount] = useState(0);
+	const [conversationUnreads, setConversationUnreads] = useState<Map<string, number>>(new Map());
+	const activeChatPartnerRef = useRef<string | null>(null);
 	const wsRef = useRef<WebSocket | null>(null);
 	const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(null);
 
 	const clearUnread = useCallback(() => setUnreadCount(0), []);
+
+	const clearConversationUnread = useCallback((partnerId: string) => {
+		setConversationUnreads(prev => {
+			if (!prev.has(partnerId)) return prev;
+			const next = new Map(prev);
+			next.delete(partnerId);
+			return next;
+		});
+	}, []);
+
+	const setActiveChatPartner = useCallback((partnerId: string | null) => {
+		activeChatPartnerRef.current = partnerId;
+		if (partnerId) {
+			clearConversationUnread(partnerId);
+		}
+	}, [clearConversationUnread]);
 
 	const connect = useCallback(() => {
 		const token = getAccessToken();
@@ -98,6 +122,15 @@ export default function ChatProvider({
 					};
 					setIncomingMessages((prev) => [...prev, chatMsg]);
 					setUnreadCount((prev) => prev + 1);
+
+					// Track per-conversation unread (skip if viewing this conversation)
+					if (msg.from !== activeChatPartnerRef.current) {
+						setConversationUnreads(prev => {
+							const next = new Map(prev);
+							next.set(msg.from, (next.get(msg.from) || 0) + 1);
+							return next;
+						});
+					}
 				}
 				// Ignore ERROR and GAME_INVITE messages for now
 			} catch {
@@ -144,7 +177,16 @@ export default function ChatProvider({
 	}, [connect]);
 
 	return (
-		<ChatContext.Provider value={{ sendMessage, incomingMessages, connected, unreadCount, clearUnread }}>
+		<ChatContext.Provider value={{
+			sendMessage,
+			incomingMessages,
+			connected,
+			unreadCount,
+			clearUnread,
+			conversationUnreads,
+			clearConversationUnread,
+			setActiveChatPartner,
+		}}>
 			{children}
 		</ChatContext.Provider>
 	);

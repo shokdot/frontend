@@ -678,12 +678,7 @@ function NewMessageModal({
 /* ──────────────────────── Page ──────────────────────── */
 
 export default function ChatPage() {
-	const { sendMessage, incomingMessages, clearUnread } = useChat();
-
-	// Clear unread badge whenever the chat page is active
-	useEffect(() => {
-		clearUnread();
-	}, [clearUnread, incomingMessages]);
+	const { sendMessage, incomingMessages, clearUnread, conversationUnreads, clearConversationUnread, setActiveChatPartner } = useChat();
 
 	// State
 	const [myUserId, setMyUserId] = useState<string | null>(null);
@@ -697,6 +692,17 @@ export default function ChatPage() {
 	const [loadingMessages, setLoadingMessages] = useState(false);
 	const [showNewMessage, setShowNewMessage] = useState(false);
 	const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+
+	// Clear global unread badge whenever the chat page is active
+	useEffect(() => {
+		clearUnread();
+	}, [clearUnread, incomingMessages]);
+
+	// Sync active conversation with ChatProvider for per-conversation unread tracking
+	useEffect(() => {
+		setActiveChatPartner(activeConvo);
+		return () => setActiveChatPartner(null);
+	}, [activeConvo, setActiveChatPartner]);
 
 	const profileCache = useRef<Map<string, ApiUserProfile>>(new Map());
 	const lastIncomingCount = useRef(0);
@@ -829,6 +835,8 @@ export default function ChatPage() {
 	}, [activeConvo, myUserId, fetchProfile]);
 
 	// Handle real-time incoming messages
+	// Unread counts are tracked by ChatProvider; this effect handles conversation
+	// metadata updates (last message, reorder) and active conversation message display.
 	useEffect(() => {
 		if (!myUserId) return;
 
@@ -840,18 +848,16 @@ export default function ChatPage() {
 		for (const msg of newMessages) {
 			const partnerId = msg.from;
 
-			// Update conversation list
+			// Update conversation list (metadata only, unread counts come from ChatProvider)
 			setConversations((prev) => {
 				const existing = prev.find((c) => c.partnerId === partnerId);
 				if (existing) {
-					const isActive = partnerId === activeConvo;
 					const updated = prev.map((c) =>
 						c.partnerId === partnerId
 							? {
 								...c,
 								lastMessage: msg.content,
 								lastTime: formatTime(msg.sentAt),
-								unreadCount: isActive ? 0 : c.unreadCount + 1,
 							}
 							: c,
 					);
@@ -871,7 +877,7 @@ export default function ChatPage() {
 					status: "offline",
 					lastMessage: msg.content,
 					lastTime: formatTime(msg.sentAt),
-					unreadCount: 1,
+					unreadCount: 0, // Actual count derived from ChatProvider context at render time
 				};
 
 				// Fetch profile in background to update name
@@ -970,12 +976,8 @@ export default function ChatPage() {
 	function handleConvoSelect(partnerId: string) {
 		setActiveConvo(partnerId);
 		setMobileShowChat(true);
-		// Clear unread count for the selected conversation
-		setConversations((prev) =>
-			prev.map((c) =>
-				c.partnerId === partnerId ? { ...c, unreadCount: 0 } : c,
-			),
-		);
+		// Clear unread in ChatProvider context (setActiveChatPartner effect also handles this)
+		clearConversationUnread(partnerId);
 	}
 
 	function handleNewConversation(profile: ApiUserProfile) {
@@ -1098,7 +1100,10 @@ export default function ChatPage() {
 								{filteredConversations.map((convo) => (
 									<ConversationItemWithStatus
 										key={convo.partnerId}
-										convo={convo}
+										convo={{
+											...convo,
+											unreadCount: conversationUnreads.get(convo.partnerId) || 0,
+										}}
 										isActive={activeConvo === convo.partnerId}
 										onClick={() => handleConvoSelect(convo.partnerId)}
 									/>
