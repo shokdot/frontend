@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
 import { useChat, type ChatMessage } from "../../components/ChatProvider";
-import { useLiveStatus, type UserStatus } from "../../components/StatusProvider";
+import { useLiveStatus, mapBackendStatus, type UserStatus } from "../../components/StatusProvider";
 import {
 	getConversations,
 	getConversationMessages,
@@ -731,10 +731,23 @@ export default function ChatPage() {
 	// Load conversation list
 	const loadConversations = useCallback(async () => {
 		try {
-			const res = await getConversations();
+			// Fetch conversations and friends statuses in parallel
+			const [convRes, friendsRes] = await Promise.all([
+				getConversations(),
+				listFriends("accepted").catch(() => null),
+			]);
+
+			// Build a map of userId → online status from friends list
+			const friendStatusMap = new Map<string, UserStatus>();
+			if (friendsRes) {
+				for (const f of friendsRes.data.friends) {
+					friendStatusMap.set(f.userId, mapBackendStatus(f.onlineStatus));
+				}
+			}
+
 			const convos: ConversationDisplay[] = [];
 
-			for (const c of res.data) {
+			for (const c of convRes.data) {
 				// Skip conversations that only have GAME_INVITE messages (no actual chat)
 				if (c.lastMessageType === "GAME_INVITE" && !c.lastMessage) continue;
 
@@ -746,7 +759,7 @@ export default function ChatPage() {
 					username: profile?.username || c.partnerId.slice(0, 8),
 					avatar: getInitials(name),
 					avatarUrl: profile?.avatarUrl ?? null,
-					status: "offline",
+					status: friendStatusMap.get(c.partnerId) ?? "offline",
 					lastMessage: c.lastMessageType === "GAME_INVITE" ? "Game Invite" : c.lastMessage,
 					lastTime: formatTime(c.lastMessageAt),
 					unreadCount: 0,
