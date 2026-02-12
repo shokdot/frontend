@@ -10,7 +10,17 @@ import {
 	ApiUserProfile,
 	getNotificationPreferences,
 	updateNotificationPreferences,
+	getAuthMe,
+	changePassword as apiChangePassword,
+	setPassword as apiSetPassword,
+	disconnectGithub as apiDisconnectGithub,
+	setup2FA as apiSetup2FA,
+	confirm2FA as apiConfirm2FA,
+	disable2FA as apiDisable2FA,
+	AuthMeData,
+	ApiError,
 } from "@/lib/api";
+import { getAccessToken, clearAuth } from "@/lib/auth";
 import { setNotificationSoundPref } from "@/lib/useNotificationSoundPref";
 
 /* ──────────────────────── Icons ──────────────────────── */
@@ -350,8 +360,241 @@ export default function SettingsPage() {
 	}, [profile]);
 
 	/* Security */
-	const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-	const [githubLinked, setGithubLinked] = useState(true);
+	const [authMe, setAuthMe] = useState<AuthMeData | null>(null);
+	const twoFactorEnabled = authMe?.twoFactorEnabled ?? false;
+	const githubLinked = authMe?.githubLinked ?? false;
+	const hasPassword = authMe?.hasPassword ?? false;
+
+	/* 2FA setup flow */
+	const [twoFaStep, setTwoFaStep] = useState<"idle" | "qr" | "confirming">("idle");
+	const [twoFaQrCode, setTwoFaQrCode] = useState<string | null>(null);
+	const [twoFaCode, setTwoFaCode] = useState("");
+	const [twoFaError, setTwoFaError] = useState<string | null>(null);
+	const [twoFaLoading, setTwoFaLoading] = useState(false);
+	const [twoFaDisableLoading, setTwoFaDisableLoading] = useState(false);
+
+	/* Disconnect GitHub modal */
+	const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+	const [disconnectNewPw, setDisconnectNewPw] = useState("");
+	const [disconnectConfirmPw, setDisconnectConfirmPw] = useState("");
+	const [disconnectError, setDisconnectError] = useState<string | null>(null);
+	const [disconnectLoading, setDisconnectLoading] = useState(false);
+
+	/* Change Password (for users who already have a password) */
+	const [changePwCurrent, setChangePwCurrent] = useState("");
+	const [changePwNew, setChangePwNew] = useState("");
+	const [changePwConfirm, setChangePwConfirm] = useState("");
+	const [changePwError, setChangePwError] = useState<string | null>(null);
+	const [changePwLoading, setChangePwLoading] = useState(false);
+	const [changePwSuccess, setChangePwSuccess] = useState(false);
+
+	/* Set Password (for OAuth users in Password section) */
+	const [setPwNew, setSetPwNew] = useState("");
+	const [setPwConfirm, setSetPwConfirm] = useState("");
+	const [setPwError, setSetPwError] = useState<string | null>(null);
+	const [setPwLoading, setSetPwLoading] = useState(false);
+	const [setPwSuccess, setSetPwSuccess] = useState(false);
+
+	const loadAuthMe = useCallback(async () => {
+		try {
+			const res = await getAuthMe();
+			setAuthMe(res.data);
+		} catch {
+			// Silently fail
+		}
+	}, []);
+
+	useEffect(() => {
+		loadAuthMe();
+	}, [loadAuthMe]);
+
+	async function handleEnable2FA() {
+		setTwoFaError(null);
+		setTwoFaLoading(true);
+		try {
+			const res = await apiSetup2FA();
+			setTwoFaQrCode(res.data.qrCodeDataURL);
+			setTwoFaStep("qr");
+			setTwoFaCode("");
+		} catch (err: unknown) {
+			const message = err instanceof ApiError ? err.message : "Failed to initialize 2FA setup";
+			setTwoFaError(message);
+		} finally {
+			setTwoFaLoading(false);
+		}
+	}
+
+	async function handleConfirm2FA() {
+		setTwoFaError(null);
+		if (!twoFaCode || twoFaCode.length !== 6) {
+			setTwoFaError("Please enter a valid 6-digit code");
+			return;
+		}
+		setTwoFaLoading(true);
+		try {
+			await apiConfirm2FA(twoFaCode);
+			await loadAuthMe();
+			setTwoFaStep("idle");
+			setTwoFaQrCode(null);
+			setTwoFaCode("");
+		} catch (err: unknown) {
+			const message = err instanceof ApiError ? err.message : "Invalid code. Please try again.";
+			setTwoFaError(message);
+		} finally {
+			setTwoFaLoading(false);
+		}
+	}
+
+	function handleCancel2FASetup() {
+		setTwoFaStep("idle");
+		setTwoFaQrCode(null);
+		setTwoFaCode("");
+		setTwoFaError(null);
+	}
+
+	async function handleDisable2FA() {
+		setTwoFaError(null);
+		setTwoFaDisableLoading(true);
+		try {
+			await apiDisable2FA();
+			await loadAuthMe();
+		} catch (err: unknown) {
+			const message = err instanceof ApiError ? err.message : "Failed to disable 2FA";
+			setTwoFaError(message);
+		} finally {
+			setTwoFaDisableLoading(false);
+		}
+	}
+
+	async function handleDisconnectGithub() {
+		if (!hasPassword) {
+			// Need to set password first — show modal
+			setShowDisconnectModal(true);
+			setDisconnectNewPw("");
+			setDisconnectConfirmPw("");
+			setDisconnectError(null);
+			return;
+		}
+		// Already has password — disconnect directly
+		try {
+			setDisconnectLoading(true);
+			await apiDisconnectGithub();
+			await loadAuthMe();
+		} catch (err: unknown) {
+			const message = err instanceof ApiError ? err.message : "Failed to disconnect GitHub";
+			setDisconnectError(message);
+			setTimeout(() => setDisconnectError(null), 4000);
+		} finally {
+			setDisconnectLoading(false);
+		}
+	}
+
+	async function handleSetPasswordAndDisconnect() {
+		setDisconnectError(null);
+		if (disconnectNewPw.length < 6) {
+			setDisconnectError("Password must be at least 6 characters");
+			return;
+		}
+		if (disconnectNewPw !== disconnectConfirmPw) {
+			setDisconnectError("Passwords do not match");
+			return;
+		}
+		try {
+			setDisconnectLoading(true);
+			await apiSetPassword(disconnectNewPw);
+			await apiDisconnectGithub();
+			await loadAuthMe();
+			setShowDisconnectModal(false);
+		} catch (err: unknown) {
+			const message = err instanceof ApiError ? err.message : "Failed to set password";
+			setDisconnectError(message);
+		} finally {
+			setDisconnectLoading(false);
+		}
+	}
+
+	async function handleChangePassword() {
+		setChangePwError(null);
+		if (!changePwCurrent) {
+			setChangePwError("Current password is required");
+			return;
+		}
+		if (changePwNew.length < 6) {
+			setChangePwError("New password must be at least 6 characters");
+			return;
+		}
+		if (changePwNew !== changePwConfirm) {
+			setChangePwError("New passwords do not match");
+			return;
+		}
+		if (changePwCurrent === changePwNew) {
+			setChangePwError("New password must be different from current password");
+			return;
+		}
+		try {
+			setChangePwLoading(true);
+			await apiChangePassword(changePwCurrent, changePwNew);
+			setChangePwCurrent("");
+			setChangePwNew("");
+			setChangePwConfirm("");
+			setChangePwSuccess(true);
+			// Show success message briefly, then log out
+			setTimeout(async () => {
+				try {
+					const token = getAccessToken();
+					await fetch("/api/v1/auth/logout", {
+						method: "POST",
+						credentials: "include",
+						headers: token ? { Authorization: `Bearer ${token}` } : {},
+					});
+				} finally {
+					clearAuth();
+					window.location.href = "/login";
+				}
+			}, 2000);
+			return;
+		} catch (err: unknown) {
+			if (err instanceof ApiError) {
+				const friendlyMessages: Record<string, string> = {
+					WRONG_PASSWORD: "The current password you entered is incorrect. Please try again.",
+					WEAK_PASSWORD: "Password is too weak. Try using a mix of letters, numbers, and symbols.",
+					INVALID_CREDENTIALS: "The current password you entered is incorrect. Please try again.",
+					OAUTH_USER: "Your account uses GitHub login. Please set a password first.",
+				};
+				setChangePwError(friendlyMessages[err.code ?? ""] ?? err.message);
+			} else {
+				setChangePwError("Failed to change password. Please try again.");
+			}
+		} finally {
+			setChangePwLoading(false);
+		}
+	}
+
+	async function handleSetPassword() {
+		setSetPwError(null);
+		if (setPwNew.length < 6) {
+			setSetPwError("Password must be at least 6 characters");
+			return;
+		}
+		if (setPwNew !== setPwConfirm) {
+			setSetPwError("Passwords do not match");
+			return;
+		}
+		try {
+			setSetPwLoading(true);
+			await apiSetPassword(setPwNew);
+			await loadAuthMe();
+			setSetPwNew("");
+			setSetPwConfirm("");
+			setSetPwSuccess(true);
+			setTimeout(() => setSetPwSuccess(false), 3000);
+		} catch (err: unknown) {
+			const message = err instanceof ApiError ? err.message : "Failed to set password";
+			setSetPwError(message);
+		} finally {
+			setSetPwLoading(false);
+		}
+	}
 
 	/* Notifications */
 	const [notifyGameInvites, setNotifyGameInvites] = useState(true);
@@ -593,74 +836,231 @@ export default function SettingsPage() {
 							<>
 								<SettingsSection
 									title="Password"
-									description="Change your password to keep your account secure"
+									description={hasPassword ? "Change your password to keep your account secure" : "Set a password to enable email & password login"}
 								>
-									<div className="space-y-4">
-										<div>
-											<label htmlFor="s-current-pw" className="mb-1.5 block text-sm font-medium text-zinc-300">
-												Current Password
-											</label>
-											<input
-												id="s-current-pw"
-												type="password"
-												placeholder="Enter current password"
-												className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
-											/>
+									{hasPassword ? (
+										<div key="change-password" className="space-y-4">
+											<div>
+												<label htmlFor="s-current-pw" className="mb-1.5 block text-sm font-medium text-zinc-300">
+													Current Password
+												</label>
+												<input
+													id="s-current-pw"
+													type="password"
+													value={changePwCurrent}
+													onChange={(e) => setChangePwCurrent(e.target.value)}
+													placeholder="Enter current password"
+													className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+												/>
+											</div>
+											<div>
+												<label htmlFor="s-new-pw" className="mb-1.5 block text-sm font-medium text-zinc-300">
+													New Password
+												</label>
+												<input
+													id="s-new-pw"
+													type="password"
+													value={changePwNew}
+													onChange={(e) => setChangePwNew(e.target.value)}
+													placeholder="Enter new password"
+													className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+												/>
+											</div>
+											<div>
+												<label htmlFor="s-confirm-pw" className="mb-1.5 block text-sm font-medium text-zinc-300">
+													Confirm New Password
+												</label>
+												<input
+													id="s-confirm-pw"
+													type="password"
+													value={changePwConfirm}
+													onChange={(e) => setChangePwConfirm(e.target.value)}
+													placeholder="Confirm new password"
+													className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+												/>
+											</div>
+											{changePwError && (
+												<p className="text-sm text-red-400">{changePwError}</p>
+											)}
+											{changePwSuccess && (
+												<p className="text-sm text-emerald-400">Password changed successfully! Redirecting to login...</p>
+											)}
+											<button
+												onClick={handleChangePassword}
+												disabled={changePwLoading}
+												className="rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium text-accent-light transition-colors hover:bg-accent/20 disabled:opacity-50"
+											>
+												{changePwLoading ? "Updating..." : "Update Password"}
+											</button>
 										</div>
-										<div>
-											<label htmlFor="s-new-pw" className="mb-1.5 block text-sm font-medium text-zinc-300">
-												New Password
-											</label>
-											<input
-												id="s-new-pw"
-												type="password"
-												placeholder="Enter new password"
-												className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
-											/>
+									) : (
+										<div key="set-password" className="space-y-4">
+											<div className="rounded-xl border border-accent/15 bg-accent/5 p-3">
+												<p className="text-xs text-zinc-400">
+													Your account was created via GitHub. Set a password to also log in with email and password.
+												</p>
+											</div>
+											<div>
+												<label htmlFor="s-set-pw" className="mb-1.5 block text-sm font-medium text-zinc-300">
+													New Password
+												</label>
+												<input
+													id="s-set-pw"
+													type="password"
+													value={setPwNew}
+													onChange={(e) => setSetPwNew(e.target.value)}
+													placeholder="Enter a password"
+													className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+												/>
+											</div>
+											<div>
+												<label htmlFor="s-set-pw-confirm" className="mb-1.5 block text-sm font-medium text-zinc-300">
+													Confirm Password
+												</label>
+												<input
+													id="s-set-pw-confirm"
+													type="password"
+													value={setPwConfirm}
+													onChange={(e) => setSetPwConfirm(e.target.value)}
+													placeholder="Confirm your password"
+													className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+												/>
+											</div>
+											{setPwError && (
+												<p className="text-sm text-red-400">{setPwError}</p>
+											)}
+											{setPwSuccess && (
+												<p className="text-sm text-emerald-400">Password set successfully!</p>
+											)}
+											<button
+												onClick={handleSetPassword}
+												disabled={setPwLoading}
+												className="rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium text-accent-light transition-colors hover:bg-accent/20 disabled:opacity-50"
+											>
+												{setPwLoading ? "Setting..." : "Set Password"}
+											</button>
 										</div>
-										<div>
-											<label htmlFor="s-confirm-pw" className="mb-1.5 block text-sm font-medium text-zinc-300">
-												Confirm New Password
-											</label>
-											<input
-												id="s-confirm-pw"
-												type="password"
-												placeholder="Confirm new password"
-												className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
-											/>
-										</div>
-										<button className="rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium text-accent-light transition-colors hover:bg-accent/20">
-											Update Password
-										</button>
-									</div>
+									)}
 								</SettingsSection>
 
 								<SettingsSection
 									title="Two-Factor Authentication"
 									description="Add an extra layer of security to your account"
 								>
-									<SettingRow
-										label="Enable 2FA"
-										description="Use an authenticator app for additional login security"
-									>
-										<Toggle
-											enabled={twoFactorEnabled}
-											onChange={setTwoFactorEnabled}
-											color="emerald"
-										/>
-									</SettingRow>
-									{twoFactorEnabled && (
-										<div className="mt-4 rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-4">
-											<div className="flex items-start gap-3">
-												<KeyIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-400" />
-												<div>
-													<p className="text-sm font-medium text-emerald-400">
-														2FA is enabled
-													</p>
-													<p className="mt-0.5 text-xs text-zinc-400">
-														Your account is protected with two-factor authentication. You&apos;ll need your authenticator app to sign in.
-													</p>
+									{twoFactorEnabled ? (
+										<>
+											<div className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-4">
+												<div className="flex items-start gap-3">
+													<KeyIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-400" />
+													<div>
+														<p className="text-sm font-medium text-emerald-400">
+															2FA is enabled
+														</p>
+														<p className="mt-0.5 text-xs text-zinc-400">
+															Your account is protected with two-factor authentication. You&apos;ll need your authenticator app to sign in.
+														</p>
+													</div>
 												</div>
+											</div>
+											{twoFaError && (
+												<p className="mt-3 text-sm text-red-400">{twoFaError}</p>
+											)}
+											<button
+												onClick={handleDisable2FA}
+												disabled={twoFaDisableLoading}
+												className="mt-4 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+											>
+												{twoFaDisableLoading ? "Disabling..." : "Disable 2FA"}
+											</button>
+										</>
+									) : twoFaStep === "idle" ? (
+										<>
+											<div className="rounded-xl border border-white/5 bg-surface-lighter/50 p-4">
+												<div className="flex items-start gap-3">
+													<KeyIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-zinc-400" />
+													<div>
+														<p className="text-sm font-medium text-zinc-300">
+															2FA is not enabled
+														</p>
+														<p className="mt-0.5 text-xs text-zinc-500">
+															Add an extra layer of security by enabling two-factor authentication with an authenticator app.
+														</p>
+													</div>
+												</div>
+											</div>
+											{twoFaError && (
+												<p className="mt-3 text-sm text-red-400">{twoFaError}</p>
+											)}
+											<button
+												onClick={handleEnable2FA}
+												disabled={twoFaLoading}
+												className="mt-4 rounded-lg bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+											>
+												{twoFaLoading ? "Setting up..." : "Enable 2FA"}
+											</button>
+										</>
+									) : (
+										<div className="space-y-5">
+											{/* Step 1: QR Code */}
+											<div className="rounded-xl border border-accent/15 bg-accent/5 p-4">
+												<p className="text-sm font-medium text-zinc-200">
+													Scan this QR code with your authenticator app
+												</p>
+												<p className="mt-1 text-xs text-zinc-500">
+													Use Google Authenticator, Authy, or any TOTP-compatible app.
+												</p>
+											</div>
+
+											{twoFaQrCode && (
+												<div className="flex justify-center">
+													<div className="rounded-xl border border-white/10 bg-white p-3">
+														<img
+															src={twoFaQrCode}
+															alt="2FA QR Code"
+															className="h-48 w-48"
+														/>
+													</div>
+												</div>
+											)}
+
+											{/* Step 2: Confirm code */}
+											<div>
+												<label htmlFor="s-2fa-code" className="mb-1.5 block text-sm font-medium text-zinc-300">
+													Enter the 6-digit code from your app
+												</label>
+												<input
+													id="s-2fa-code"
+													type="text"
+													inputMode="numeric"
+													maxLength={6}
+													value={twoFaCode}
+													onChange={(e) => {
+														const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+														setTwoFaCode(val);
+													}}
+													placeholder="000000"
+													className="w-full max-w-xs rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-center text-lg font-mono tracking-[0.3em] text-white placeholder-zinc-600 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+												/>
+											</div>
+
+											{twoFaError && (
+												<p className="text-sm text-red-400">{twoFaError}</p>
+											)}
+
+											<div className="flex gap-3">
+												<button
+													onClick={handleConfirm2FA}
+													disabled={twoFaLoading || twoFaCode.length !== 6}
+													className="rounded-lg bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+												>
+													{twoFaLoading ? "Verifying..." : "Verify & Enable"}
+												</button>
+												<button
+													onClick={handleCancel2FASetup}
+													className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:text-white"
+												>
+													Cancel
+												</button>
 											</div>
 										</div>
 									)}
@@ -682,17 +1082,85 @@ export default function SettingsPage() {
 												</p>
 											</div>
 										</div>
-										<button
-											onClick={() => setGithubLinked(!githubLinked)}
-											className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${githubLinked
-												? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
-												: "bg-accent/10 text-accent-light hover:bg-accent/20"
-												}`}
-										>
-											{githubLinked ? "Disconnect" : "Connect"}
-										</button>
+										{githubLinked ? (
+											<button
+												onClick={handleDisconnectGithub}
+												disabled={disconnectLoading}
+												className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+											>
+												{disconnectLoading ? "Disconnecting..." : "Disconnect"}
+											</button>
+										) : (
+											<a
+												href={`${process.env.NEXT_PUBLIC_OAUTH_URL || ""}/api/v1/auth/oauth/github`}
+												className="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors bg-accent/10 text-accent-light hover:bg-accent/20"
+											>
+												Connect
+											</a>
+										)}
 									</div>
+									{disconnectError && !showDisconnectModal && (
+										<p className="mt-2 text-sm text-red-400">{disconnectError}</p>
+									)}
 								</SettingsSection>
+
+								{/* Set Password & Disconnect Modal */}
+								{showDisconnectModal && (
+									<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+										<div className="mx-4 w-full max-w-md rounded-2xl border border-white/10 bg-surface-light p-6 shadow-2xl">
+											<h3 className="text-lg font-semibold text-white">Set a Password</h3>
+											<p className="mt-1 text-sm text-zinc-400">
+												To disconnect GitHub, you need to set a password first so you can still log in.
+											</p>
+											<div className="mt-5 space-y-4">
+												<div>
+													<label htmlFor="dm-new-pw" className="mb-1.5 block text-sm font-medium text-zinc-300">
+														New Password
+													</label>
+													<input
+														id="dm-new-pw"
+														type="password"
+														value={disconnectNewPw}
+														onChange={(e) => setDisconnectNewPw(e.target.value)}
+														placeholder="Enter a password"
+														className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+													/>
+												</div>
+												<div>
+													<label htmlFor="dm-confirm-pw" className="mb-1.5 block text-sm font-medium text-zinc-300">
+														Confirm Password
+													</label>
+													<input
+														id="dm-confirm-pw"
+														type="password"
+														value={disconnectConfirmPw}
+														onChange={(e) => setDisconnectConfirmPw(e.target.value)}
+														placeholder="Confirm your password"
+														className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+													/>
+												</div>
+												{disconnectError && (
+													<p className="text-sm text-red-400">{disconnectError}</p>
+												)}
+											</div>
+											<div className="mt-6 flex justify-end gap-3">
+												<button
+													onClick={() => setShowDisconnectModal(false)}
+													className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-400 transition-colors hover:text-white"
+												>
+													Cancel
+												</button>
+												<button
+													onClick={handleSetPasswordAndDisconnect}
+													disabled={disconnectLoading}
+													className="rounded-lg bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+												>
+													{disconnectLoading ? "Processing..." : "Set Password & Disconnect"}
+												</button>
+											</div>
+										</div>
+									</div>
+								)}
 
 								<SettingsSection title="Danger Zone">
 									<div className="rounded-xl border border-red-500/15 bg-red-500/5 p-4">

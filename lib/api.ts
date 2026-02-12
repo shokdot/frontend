@@ -494,3 +494,84 @@ export function deleteConversation(userId: string) {
 		{ method: "DELETE" },
 	);
 }
+
+/* ───────────── Auth API ───────────── */
+
+export interface AuthMeData {
+	userId: string;
+	email: string;
+	isEmailVerified: boolean;
+	hasPassword: boolean;
+	githubLinked: boolean;
+	twoFactorEnabled: boolean;
+	createdAt: string;
+	updatedAt: string;
+}
+
+interface GetAuthMeResponse {
+	status: string;
+	data: AuthMeData;
+	message: string;
+}
+
+export function getAuthMe() {
+	return apiFetch<GetAuthMeResponse>("/api/v1/auth/me");
+}
+
+export function changePassword(oldPassword: string, newPassword: string) {
+	return apiFetch<{ status: string; message: string }>(
+		"/api/v1/auth/password/change",
+		{
+			method: "PUT",
+			body: JSON.stringify({ oldPassword, newPassword }),
+		},
+	);
+}
+
+export function setPassword(newPassword: string) {
+	return apiFetch<{ status: string; message: string }>(
+		"/api/v1/auth/password/set",
+		{
+			method: "PUT",
+			body: JSON.stringify({ newPassword }),
+		},
+	);
+}
+
+export function disconnectGithub() {
+	return apiFetch<{ status: string; message: string }>(
+		"/api/v1/auth/oauth/github",
+		{ method: "DELETE" },
+	);
+}
+
+/* ───────────── 2FA API ───────────── */
+
+interface Setup2FAResponse {
+	status: string;
+	data: { userId: string; qrCodeDataURL: string };
+	message: string;
+}
+
+export function setup2FA() {
+	return apiFetch<Setup2FAResponse>("/api/v1/auth/2fa/setup", {
+		method: "POST",
+	});
+}
+
+export function confirm2FA(token: string) {
+	return apiFetch<{ status: string; data: { userId: string }; message: string }>(
+		"/api/v1/auth/2fa/confirm",
+		{
+			method: "POST",
+			body: JSON.stringify({ token }),
+		},
+	);
+}
+
+export function disable2FA() {
+	return apiFetch<{ status: string; message: string }>(
+		"/api/v1/auth/2fa/disable",
+		{ method: "DELETE" },
+	);
+}

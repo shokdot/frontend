@@ -38,6 +38,12 @@ export default function LoginPage() {
 	});
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
+	/* 2FA verification state */
+	const [twoFaRequired, setTwoFaRequired] = useState(false);
+	const [twoFaSessionToken, setTwoFaSessionToken] = useState("");
+	const [twoFaCode, setTwoFaCode] = useState("");
+	const [twoFaError, setTwoFaError] = useState("");
+
 	function clearFieldError(field: keyof FieldErrors) {
 		setFieldErrors((prev) => {
 			const next = { ...prev };
@@ -93,6 +99,15 @@ export default function LoginPage() {
 				}
 			}
 
+			/* 2FA required — show code entry */
+			if (data?.status === "pending" && data?.data?.twoFaToken) {
+				setTwoFaRequired(true);
+				setTwoFaSessionToken(data.data.twoFaToken);
+				setTwoFaCode("");
+				setTwoFaError("");
+				return;
+			}
+
 			if (data?.data?.accessToken) {
 				setAccessToken(data.data.accessToken);
 			}
@@ -105,6 +120,149 @@ export default function LoginPage() {
 		}
 	}
 
+	async function handle2FAVerify(e: React.FormEvent) {
+		e.preventDefault();
+		setTwoFaError("");
+		setIsLoading(true);
+
+		try {
+			const res = await fetch("/api/v1/auth/2fa/verify", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				credentials: "include",
+				body: JSON.stringify({
+					token: Number(twoFaCode),
+					session_token: twoFaSessionToken,
+				}),
+			});
+
+			const data = await res.json().catch(() => null);
+
+			if (!res.ok) {
+				const code = data?.error?.code;
+				const message = data?.error?.message;
+
+				if (code === "INVALID_2FA_TOKEN") {
+					setTwoFaError("Invalid code. Please check your authenticator app and try again.");
+				} else if (code === "TOO_MANY_REQUESTS") {
+					setTwoFaError("Too many attempts. Please wait a moment and try again.");
+				} else {
+					setTwoFaError(message || "Verification failed. Please try again.");
+				}
+				return;
+			}
+
+			if (data?.data?.accessToken) {
+				setAccessToken(data.data.accessToken);
+			}
+
+			window.location.href = redirectTo;
+		} catch {
+			setTwoFaError("Unable to connect. Please check your internet connection.");
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
+	/* ── 2FA Verification Screen ── */
+	if (twoFaRequired) {
+		return (
+			<div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
+				<div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(0,240,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,240,255,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
+				<div className="pointer-events-none absolute top-[-200px] left-1/2 h-[600px] w-[600px] -translate-x-1/2 rounded-full bg-accent/8 blur-[150px]" />
+				<div className="pointer-events-none absolute bottom-[-100px] right-[-100px] h-[400px] w-[400px] rounded-full bg-neon-cyan/5 blur-[120px]" />
+
+				<div className="relative z-10 w-full max-w-md">
+					<div className="mb-8 text-center">
+						<Link href="/" className="inline-flex items-center gap-2.5">
+							<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent shadow-[0_0_20px_rgba(139,92,246,0.4)]">
+								<svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+									<path d="M8 5v14l11-7z" />
+								</svg>
+							</div>
+							<span className="text-xl font-bold text-white">transcendence</span>
+						</Link>
+					</div>
+
+					<div className="rounded-2xl border border-white/5 bg-surface-light p-8 shadow-[0_0_30px_rgba(139,92,246,0.06)] sm:p-10">
+						<div className="mb-8 text-center">
+							<div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-emerald-500/20 bg-emerald-500/10">
+								<svg className="h-7 w-7 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+									<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+								</svg>
+							</div>
+							<h1 className="text-2xl font-bold text-white sm:text-3xl">
+								Two-Factor <span className="text-emerald-400">Authentication</span>
+							</h1>
+							<p className="mt-2 text-sm text-zinc-400">
+								Enter the 6-digit code from your authenticator app
+							</p>
+						</div>
+
+						{twoFaError && (
+							<div className="mb-6 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+								{twoFaError}
+							</div>
+						)}
+
+						<form onSubmit={handle2FAVerify} className="space-y-5">
+							<div>
+								<label htmlFor="twofa-code" className="mb-1.5 block text-sm font-medium text-zinc-300">
+									Verification Code
+								</label>
+								<input
+									id="twofa-code"
+									type="text"
+									inputMode="numeric"
+									maxLength={6}
+									autoFocus
+									value={twoFaCode}
+									onChange={(e) => {
+										const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+										setTwoFaCode(val);
+									}}
+									placeholder="000000"
+									className="w-full rounded-lg border border-white/10 bg-surface-lighter py-3 px-4 text-center text-xl font-mono tracking-[0.4em] text-white placeholder-zinc-600 outline-none transition-all focus:border-emerald-500/40 focus:shadow-[0_0_15px_rgba(52,211,153,0.1)] focus:ring-1 focus:ring-emerald-500/30"
+								/>
+							</div>
+
+							<button
+								type="submit"
+								disabled={isLoading || twoFaCode.length !== 6}
+								className="w-full rounded-lg bg-emerald-600 py-2.5 text-sm font-semibold text-white shadow-[0_0_20px_rgba(52,211,153,0.3)] transition-all hover:bg-emerald-500 hover:shadow-[0_0_30px_rgba(52,211,153,0.5)] disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								{isLoading ? (
+									<span className="inline-flex items-center gap-2">
+										<svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+											<circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+											<path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+										</svg>
+										Verifying...
+									</span>
+								) : (
+									"Verify & Sign In"
+								)}
+							</button>
+						</form>
+
+						<button
+							onClick={() => {
+								setTwoFaRequired(false);
+								setTwoFaSessionToken("");
+								setTwoFaCode("");
+								setTwoFaError("");
+							}}
+							className="mt-4 w-full text-center text-sm text-zinc-500 transition-colors hover:text-zinc-300"
+						>
+							Back to sign in
+						</button>
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	/* ── Normal Login Screen ── */
 	return (
 		<div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-12">
 			{/* Background effects */}
@@ -252,9 +410,9 @@ export default function LoginPage() {
 						<div className="h-px flex-1 bg-white/5" />
 					</div>
 
-				{/* OAuth */}
-				<a
-					href={`${process.env.NEXT_PUBLIC_OAUTH_URL || ""}/api/v1/auth/oauth/github`}
+					{/* OAuth */}
+					<a
+						href={`${process.env.NEXT_PUBLIC_OAUTH_URL || ""}/api/v1/auth/oauth/github`}
 						className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-white/10 bg-surface-lighter py-2.5 text-sm font-medium text-zinc-300 transition-all hover:border-neon-cyan/20 hover:text-white hover:shadow-[0_0_15px_rgba(0,240,255,0.08)]"
 					>
 						<svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="currentColor">
