@@ -12,6 +12,9 @@ import {
 	getMyProfile,
 	searchUsers,
 	listFriends,
+	sendFriendRequest,
+	removeFriend,
+	acceptFriendRequest,
 	listBlocked,
 	blockUser,
 	unblockUser,
@@ -121,6 +124,36 @@ function XIcon({ className }: { className?: string }) {
 		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
 			<line x1="18" y1="6" x2="6" y2="18" />
 			<line x1="6" y1="6" x2="18" y2="18" />
+		</svg>
+	);
+}
+
+function UserPlusIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+			<path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+			<circle cx="9" cy="7" r="4" />
+			<line x1="19" y1="8" x2="19" y2="14" />
+			<line x1="22" y1="11" x2="16" y2="11" />
+		</svg>
+	);
+}
+
+function UserCheckIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+			<path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" />
+			<circle cx="9" cy="7" r="4" />
+			<polyline points="16 11 18 13 22 9" />
+		</svg>
+	);
+}
+
+function ClockIcon({ className }: { className?: string }) {
+	return (
+		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+			<circle cx="12" cy="12" r="10" />
+			<polyline points="12 6 12 12 16 14" />
 		</svg>
 	);
 }
@@ -1137,6 +1170,7 @@ function ChatArea({
 	onSend,
 	onBlock,
 	onUnblock,
+	onDeleteConversation,
 }: {
 	conversation: ConversationDisplay;
 	messages: MessageDisplay[];
@@ -1160,6 +1194,8 @@ function ChatArea({
 	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 	const [blockLoading, setBlockLoading] = useState(false);
 	const [deleteLoading, setDeleteLoading] = useState(false);
+	const [friendStatus, setFriendStatus] = useState<"none" | "pending_outgoing" | "pending_incoming" | "accepted">("none");
+	const [friendLoading, setFriendLoading] = useState(false);
 	const dropdownRef = useRef<HTMLDivElement>(null);
 
 	// Close dropdown on click outside or Escape
@@ -1204,6 +1240,70 @@ function ChatArea({
 		} finally {
 			setDeleteLoading(false);
 			setShowDeleteConfirm(false);
+		}
+	}
+
+	// Fetch friend status when conversation changes
+	useEffect(() => {
+		let cancelled = false;
+		async function fetchFriendStatus() {
+			try {
+				const res = await listFriends();
+				if (cancelled) return;
+				const friend = res.data.friends.find(
+					(f) => f.username === conversation.username,
+				);
+				if (!friend) {
+					setFriendStatus("none");
+				} else if (friend.status === "accepted") {
+					setFriendStatus("accepted");
+				} else if (friend.direction === "outgoing") {
+					setFriendStatus("pending_outgoing");
+				} else {
+					setFriendStatus("pending_incoming");
+				}
+			} catch {
+				if (!cancelled) setFriendStatus("none");
+			}
+		}
+		setFriendStatus("none");
+		fetchFriendStatus();
+		return () => { cancelled = true; };
+	}, [conversation.partnerId, conversation.username]);
+
+	async function handleAddFriend() {
+		setFriendLoading(true);
+		try {
+			await sendFriendRequest(conversation.username);
+			setFriendStatus("pending_outgoing");
+		} catch {
+			// Silently fail
+		} finally {
+			setFriendLoading(false);
+		}
+	}
+
+	async function handleAcceptFriend() {
+		setFriendLoading(true);
+		try {
+			await acceptFriendRequest(conversation.username);
+			setFriendStatus("accepted");
+		} catch {
+			// Silently fail
+		} finally {
+			setFriendLoading(false);
+		}
+	}
+
+	async function handleRemoveFriend() {
+		setFriendLoading(true);
+		try {
+			await removeFriend(conversation.username);
+			setFriendStatus("none");
+		} catch {
+			// Silently fail
+		} finally {
+			setFriendLoading(false);
 		}
 	}
 
@@ -1279,6 +1379,46 @@ function ChatArea({
 							<GamepadIcon className="h-4 w-4" />
 						</button>
 					)}
+					{!isBlocked && friendStatus === "none" && (
+						<button
+							onClick={handleAddFriend}
+							disabled={friendLoading}
+							className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-emerald-400 disabled:opacity-50"
+							title="Add Friend"
+						>
+							<UserPlusIcon className="h-4 w-4" />
+						</button>
+					)}
+					{!isBlocked && friendStatus === "pending_outgoing" && (
+						<button
+							onClick={handleRemoveFriend}
+							disabled={friendLoading}
+							className="rounded-lg p-2 text-amber-400/70 transition-colors hover:bg-white/5 hover:text-amber-300 disabled:opacity-50"
+							title="Cancel Request"
+						>
+							<ClockIcon className="h-4 w-4" />
+						</button>
+					)}
+					{!isBlocked && friendStatus === "pending_incoming" && (
+						<button
+							onClick={handleAcceptFriend}
+							disabled={friendLoading}
+							className="rounded-lg p-2 text-emerald-400 transition-colors hover:bg-white/5 hover:text-emerald-300 disabled:opacity-50"
+							title="Accept Friend Request"
+						>
+							<UserPlusIcon className="h-4 w-4" />
+						</button>
+					)}
+					{!isBlocked && friendStatus === "accepted" && (
+						<button
+							onClick={handleRemoveFriend}
+							disabled={friendLoading}
+							className="rounded-lg p-2 text-emerald-400 transition-colors hover:bg-white/5 hover:text-red-400 disabled:opacity-50"
+							title="Unfriend"
+						>
+							<UserCheckIcon className="h-4 w-4" />
+						</button>
+					)}
 					<div className="relative" ref={dropdownRef}>
 						<button
 							onClick={() => setShowDropdown((v) => !v)}
@@ -1297,7 +1437,7 @@ function ChatArea({
 									className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-zinc-300 transition-colors hover:bg-white/5"
 								>
 									<TrashIcon className="h-4 w-4" />
-									Delete Conversation
+									Delete Chat
 								</button>
 								<div className="mx-3 h-px bg-white/5" />
 								{isBlocked ? (
@@ -1426,10 +1566,10 @@ function ChatArea({
 				/>
 			)}
 
-			{/* Delete conversation confirmation dialog */}
+			{/* Delete chat confirmation dialog */}
 			{showDeleteConfirm && (
 				<ConfirmDialog
-					title="Delete conversation?"
+					title="Delete chat?"
 					description="All messages in this conversation will be permanently deleted. This cannot be undone."
 					confirmLabel="Delete"
 					loading={deleteLoading}
