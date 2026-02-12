@@ -26,6 +26,10 @@ interface ChatContextValue {
 	incomingMessages: ChatMessage[];
 	/** Whether the WebSocket is currently connected */
 	connected: boolean;
+	/** Number of unread incoming messages (resets on clearUnread) */
+	unreadCount: number;
+	/** Reset the unread counter (call when the user views the chat page) */
+	clearUnread: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -56,8 +60,11 @@ export default function ChatProvider({
 }) {
 	const [incomingMessages, setIncomingMessages] = useState<ChatMessage[]>([]);
 	const [connected, setConnected] = useState(false);
+	const [unreadCount, setUnreadCount] = useState(0);
 	const wsRef = useRef<WebSocket | null>(null);
 	const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(null);
+
+	const clearUnread = useCallback(() => setUnreadCount(0), []);
 
 	const connect = useCallback(() => {
 		const token = getAccessToken();
@@ -90,6 +97,7 @@ export default function ChatProvider({
 						sentAt: msg.sentAt,
 					};
 					setIncomingMessages((prev) => [...prev, chatMsg]);
+					setUnreadCount((prev) => prev + 1);
 				}
 				// Ignore ERROR and GAME_INVITE messages for now
 			} catch {
@@ -136,7 +144,7 @@ export default function ChatProvider({
 	}, [connect]);
 
 	return (
-		<ChatContext.Provider value={{ sendMessage, incomingMessages, connected }}>
+		<ChatContext.Provider value={{ sendMessage, incomingMessages, connected, unreadCount, clearUnread }}>
 			{children}
 		</ChatContext.Provider>
 	);

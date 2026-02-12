@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-accent: #8b5cf6;
-  --color-accent-light: #a78bfa;
-  --color-accent-dark: #7c3aed;
-  --color-neon-cyan: #00f0ff;
-  --color-neon-purple: #bf5af2;
-  --color-neon-pink: #e040fb;
-  --color-surface: #08080c;
-  --color-surface-light: #111118;
-  --color-surface-lighter: #1a1a24;
+	--color-accent: #8b5cf6;
+	--color-accent-light: #a78bfa;
+	--color-accent-dark: #7c3aed;
+	--color-neon-cyan: #00f0ff;
+	--color-neon-purple: #bf5af2;
+	--color-neon-pink: #e040fb;
+	--color-surface: #08080c;
+	--color-surface-light: #111118;
+	--color-surface-lighter: #1a1a24;
 }
 
 /* ── Light theme overrides ──
@@ -19,233 +19,320 @@
    without touching a single component file. */
 
 [data-theme="light"] {
-  /* Surface / background */
-  --color-surface: #f4f4f7;
-  --color-surface-light: #ffffff;
-  --color-surface-lighter: #eaeaf0;
+	/* Surface / background — slightly deeper for better card separation */
+	--color-surface: #eff0f5;
+	--color-surface-light: #ffffff;
+	--color-surface-lighter: #e5e5ed;
 
-  /* Remap "white" so text-white, border-white/*, bg-white/* become dark */
-  --color-white: #1a1a2e;
+	/* Remap "white" so text-white, border-white/*, bg-white/* become dark */
+	--color-white: #111127;
 
-  /* Keep black as-is (used for overlays like bg-black/60) */
+	/* Keep black as-is (used for overlays like bg-black/60) */
 
-  /* Invert zinc scale — light shades become dark and vice-versa
-     so that text-zinc-300 (secondary text on dark) is readable on light */
-  --color-zinc-100: #3f3f46;
-  --color-zinc-200: #52525b;
-  --color-zinc-300: #4b5563;
-  --color-zinc-400: #6b7280;
-  --color-zinc-500: #9ca3af;
-  --color-zinc-600: #d1d5db;
-  --color-zinc-700: #e5e7eb;
-  --color-zinc-800: #f3f4f6;
-  --color-zinc-900: #f9fafb;
-  --color-zinc-950: #ffffff;
+	/* Inverted zinc scale — compressed toward dark end so that ALL
+	   text shades remain readable on light surfaces.
+	   Contrast ratios on #ffffff:
+	     100 ≈ 13:1 · 200 ≈ 8.5:1 · 300 ≈ 7.2:1
+	     400 ≈ 6.5:1 · 500 ≈ 4.9:1 · 600 ≈ 3.5:1 */
+	--color-zinc-100: #27272a;
+	--color-zinc-200: #3f3f46;
+	--color-zinc-300: #52525b;
+	--color-zinc-400: #5a5d68;
+	--color-zinc-500: #6e7178;
+	--color-zinc-600: #85888f;
+	--color-zinc-700: #c4c4cc;
+	--color-zinc-800: #e4e4e7;
+	--color-zinc-900: #f4f4f5;
+	--color-zinc-950: #ffffff;
 
-  /* Neon colours — slightly deeper for legibility on light backgrounds */
-  --color-neon-cyan: #0891b2;
-  --color-neon-purple: #9333ea;
-  --color-neon-pink: #c026d3;
+	/* Neon colours — deeper for strong legibility on light backgrounds */
+	--color-neon-cyan: #0e7490;
+	--color-neon-purple: #7e22ce;
+	--color-neon-pink: #a21caf;
 
-  /* Accent stays the same — it has enough contrast on white */
+	/* Accent — darker for reliable AA contrast on white (~5.7:1) */
+	--color-accent: #7c3aed;
+	--color-accent-light: #8b5cf6;
+	--color-accent-dark: #6d28d9;
 
-  /* Emerald (wins / success) — deepen a notch */
-  --color-emerald-400: #059669;
-  --color-emerald-500: #047857;
+	/* Emerald (wins / success) — deepen a notch */
+	--color-emerald-400: #059669;
+	--color-emerald-500: #047857;
 
-  /* Red (losses / danger) */
-  --color-red-400: #dc2626;
-  --color-red-500: #b91c1c;
+	/* Red (losses / danger) */
+	--color-red-400: #dc2626;
+	--color-red-500: #b91c1c;
 
-  /* Amber (rank badges, warnings) */
-  --color-amber-400: #d97706;
-  --color-amber-500: #b45309;
-  --color-amber-600: #92400e;
+	/* Amber (rank badges, warnings) */
+	--color-amber-400: #d97706;
+	--color-amber-500: #b45309;
+	--color-amber-600: #92400e;
 
-  color-scheme: light;
+	color-scheme: light;
 }
 
 /* ── Base ── */
 
 html {
-  scroll-behavior: smooth;
-  overflow-x: hidden;
+	scroll-behavior: smooth;
+	overflow-x: hidden;
 }
 
 body {
-  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
-  background-color: var(--color-surface);
-  color: var(--color-zinc-200, #e4e4e7);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  min-height: 100dvh;
-  overflow-x: hidden;
+	font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+	background-color: var(--color-surface);
+	color: var(--color-zinc-200, #e4e4e7);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	min-height: 100dvh;
+	overflow-x: hidden;
 }
 
 /* ── Neon text effects ── */
 
 .neon-text-cyan {
-  text-shadow:
-    0 0 7px rgba(0, 240, 255, 0.7),
-    0 0 20px rgba(0, 240, 255, 0.4),
-    0 0 40px rgba(0, 240, 255, 0.2);
+	text-shadow:
+		0 0 7px rgba(0, 240, 255, 0.7),
+		0 0 20px rgba(0, 240, 255, 0.4),
+		0 0 40px rgba(0, 240, 255, 0.2);
 }
 
 .neon-text-purple {
-  text-shadow:
-    0 0 7px rgba(139, 92, 246, 0.7),
-    0 0 20px rgba(139, 92, 246, 0.4),
-    0 0 40px rgba(139, 92, 246, 0.2);
+	text-shadow:
+		0 0 7px rgba(139, 92, 246, 0.7),
+		0 0 20px rgba(139, 92, 246, 0.4),
+		0 0 40px rgba(139, 92, 246, 0.2);
 }
 
 /* Soften glows in light mode */
 [data-theme="light"] .neon-text-cyan,
 [data-theme="light"] .neon-text-purple {
-  text-shadow: none;
+	text-shadow: none;
 }
 
 /* ── Neon box glows ── */
 
 .neon-box-cyan {
-  box-shadow:
-    0 0 10px rgba(0, 240, 255, 0.15),
-    0 0 30px rgba(0, 240, 255, 0.08),
-    inset 0 0 10px rgba(0, 240, 255, 0.05);
+	box-shadow:
+		0 0 10px rgba(0, 240, 255, 0.15),
+		0 0 30px rgba(0, 240, 255, 0.08),
+		inset 0 0 10px rgba(0, 240, 255, 0.05);
 }
 
 .neon-box-purple {
-  box-shadow:
-    0 0 10px rgba(139, 92, 246, 0.2),
-    0 0 30px rgba(139, 92, 246, 0.1),
-    inset 0 0 10px rgba(139, 92, 246, 0.05);
+	box-shadow:
+		0 0 10px rgba(139, 92, 246, 0.2),
+		0 0 30px rgba(139, 92, 246, 0.1),
+		inset 0 0 10px rgba(139, 92, 246, 0.05);
 }
 
 .neon-box-purple-strong {
-  box-shadow:
-    0 0 15px rgba(139, 92, 246, 0.4),
-    0 0 40px rgba(139, 92, 246, 0.2),
-    0 0 80px rgba(139, 92, 246, 0.1);
+	box-shadow:
+		0 0 15px rgba(139, 92, 246, 0.4),
+		0 0 40px rgba(139, 92, 246, 0.2),
+		0 0 80px rgba(139, 92, 246, 0.1);
 }
 
-/* Replace heavy glows with subtle shadows in light mode */
+/* Replace heavy glows with defined shadows in light mode */
 [data-theme="light"] .neon-box-cyan {
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.06),
-    0 0 0 1px rgba(8, 145, 178, 0.1);
+	box-shadow:
+		0 1px 4px rgba(0, 0, 0, 0.08),
+		0 0 0 1px rgba(14, 116, 144, 0.18);
 }
 
 [data-theme="light"] .neon-box-purple {
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.06),
-    0 0 0 1px rgba(139, 92, 246, 0.12);
+	box-shadow:
+		0 1px 4px rgba(0, 0, 0, 0.08),
+		0 0 0 1px rgba(126, 34, 206, 0.18);
 }
 
 [data-theme="light"] .neon-box-purple-strong {
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.08),
-    0 0 0 1px rgba(139, 92, 246, 0.15);
+	box-shadow:
+		0 2px 10px rgba(0, 0, 0, 0.10),
+		0 0 0 1px rgba(126, 34, 206, 0.22);
 }
 
 /* ── Animations ── */
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
+
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+
+	50% {
+		transform: translateY(-12px);
+	}
 }
 
 @keyframes neon-pulse {
-  0%, 100% {
-    box-shadow:
-      0 0 10px rgba(0, 240, 255, 0.3),
-      0 0 30px rgba(0, 240, 255, 0.15);
-  }
-  50% {
-    box-shadow:
-      0 0 20px rgba(0, 240, 255, 0.6),
-      0 0 50px rgba(0, 240, 255, 0.3),
-      0 0 80px rgba(0, 240, 255, 0.15);
-  }
+
+	0%,
+	100% {
+		box-shadow:
+			0 0 10px rgba(0, 240, 255, 0.3),
+			0 0 30px rgba(0, 240, 255, 0.15);
+	}
+
+	50% {
+		box-shadow:
+			0 0 20px rgba(0, 240, 255, 0.6),
+			0 0 50px rgba(0, 240, 255, 0.3),
+			0 0 80px rgba(0, 240, 255, 0.15);
+	}
 }
 
 @keyframes neon-pulse-purple {
-  0%, 100% {
-    box-shadow:
-      0 0 10px rgba(139, 92, 246, 0.3),
-      0 0 30px rgba(139, 92, 246, 0.15);
-  }
-  50% {
-    box-shadow:
-      0 0 20px rgba(139, 92, 246, 0.6),
-      0 0 50px rgba(139, 92, 246, 0.3),
-      0 0 80px rgba(139, 92, 246, 0.15);
-  }
+
+	0%,
+	100% {
+		box-shadow:
+			0 0 10px rgba(139, 92, 246, 0.3),
+			0 0 30px rgba(139, 92, 246, 0.15);
+	}
+
+	50% {
+		box-shadow:
+			0 0 20px rgba(139, 92, 246, 0.6),
+			0 0 50px rgba(139, 92, 246, 0.3),
+			0 0 80px rgba(139, 92, 246, 0.15);
+	}
 }
 
 @keyframes neon-flicker {
-  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
-    opacity: 1;
-  }
-  20%, 24%, 55% {
-    opacity: 0.6;
-  }
+
+	0%,
+	19%,
+	21%,
+	23%,
+	25%,
+	54%,
+	56%,
+	100% {
+		opacity: 1;
+	}
+
+	20%,
+	24%,
+	55% {
+		opacity: 0.6;
+	}
 }
 
 @keyframes neon-border-rotate {
-  0% { --angle: 0deg; }
-  100% { --angle: 360deg; }
+	0% {
+		--angle: 0deg;
+	}
+
+	100% {
+		--angle: 360deg;
+	}
 }
 
 @keyframes ball-bounce {
-  0%   { left: 10%; top: 30%; }
-  25%  { left: 85%; top: 70%; }
-  50%  { left: 15%; top: 60%; }
-  75%  { left: 80%; top: 25%; }
-  100% { left: 10%; top: 30%; }
+	0% {
+		left: 10%;
+		top: 30%;
+	}
+
+	25% {
+		left: 85%;
+		top: 70%;
+	}
+
+	50% {
+		left: 15%;
+		top: 60%;
+	}
+
+	75% {
+		left: 80%;
+		top: 25%;
+	}
+
+	100% {
+		left: 10%;
+		top: 30%;
+	}
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+	0% {
+		background-position: -200% 0;
+	}
+
+	100% {
+		background-position: 200% 0;
+	}
 }
 
 .animate-float {
-  animation: float 3s ease-in-out infinite;
+	animation: float 3s ease-in-out infinite;
 }
 
 .animate-neon-pulse {
-  animation: neon-pulse 2.5s ease-in-out infinite;
+	animation: neon-pulse 2.5s ease-in-out infinite;
 }
 
 .animate-neon-pulse-purple {
-  animation: neon-pulse-purple 2.5s ease-in-out infinite;
+	animation: neon-pulse-purple 2.5s ease-in-out infinite;
 }
 
 .animate-neon-flicker {
-  animation: neon-flicker 4s linear infinite;
+	animation: neon-flicker 4s linear infinite;
 }
 
 .animate-ball {
-  animation: ball-bounce 6s ease-in-out infinite;
+	animation: ball-bounce 6s ease-in-out infinite;
 }
 
 @keyframes ping-once {
-  0%   { transform: scale(0.5); opacity: 0; }
-  50%  { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.5); opacity: 0; }
+	0% {
+		transform: scale(0.5);
+		opacity: 0;
+	}
+
+	50% {
+		transform: scale(1);
+		opacity: 1;
+	}
+
+	100% {
+		transform: scale(1.5);
+		opacity: 0;
+	}
 }
 
 .animate-ping-once {
-  animation: ping-once 0.7s ease-out forwards;
+	animation: ping-once 0.7s ease-out forwards;
 }
 
 .animate-shimmer {
-  background-size: 200% 100%;
-  animation: shimmer 3s linear infinite;
+	background-size: 200% 100%;
+	animation: shimmer 3s linear infinite;
 }
 
 /* ── Toast progress bar ── */
 
+@keyframes fadeSlideIn {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
 @keyframes shrink {
-  from { width: 100%; }
-  to { width: 0%; }
+	from {
+		width: 100%;
+	}
+
+	to {
+		width: 0%;
+	}
 }

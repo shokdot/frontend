@@ -7,8 +7,11 @@ import {
 	markNotificationRead,
 	markAllNotificationsRead,
 	deleteNotification,
+	getUserById,
 } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
+import { playNotificationSound } from "@/lib/notificationSound";
+import { useNotificationSoundPref } from "@/lib/useNotificationSoundPref";
 import { useNotifications } from "./NotificationProvider";
 
 /* ──────────────────────── Types ──────────────────────── */
@@ -128,7 +131,24 @@ function formatNotifTitle(type: string): string {
 		case "game_invite": return "Game Invite";
 		case "friend_request": return "Friend Request";
 		case "match_result": return "Match Result";
+		case "NEW_MESSAGE": return "New Message";
 		default: return "Notification";
+	}
+}
+
+/** Cache for resolved usernames so we don't refetch on every message. */
+const usernameCache = new Map<string, string>();
+
+async function resolveUsername(userId: string): Promise<string> {
+	const cached = usernameCache.get(userId);
+	if (cached) return cached;
+	try {
+		const res = await getUserById(userId);
+		const name = res.data.username || res.data.displayName || "Someone";
+		usernameCache.set(userId, name);
+		return name;
+	} catch {
+		return "Someone";
 	}
 }
 
@@ -215,6 +235,26 @@ function useNotificationWebSocket(
 	}, [connect]);
 }
 
+/* ──────────────────── Toast throttle (per sender) ──────────────────── */
+
+/** Minimum interval (ms) between toasts for the same key (e.g. same sender). */
+const TOAST_THROTTLE_MS = 5_000;
+
+/**
+ * Derive a throttle key from a notification.
+ * For chat messages, key by sender so rapid messages only show one toast.
+ * For other types, key by the notification type itself.
+ */
+function toastThrottleKey(notif: ApiNotification): string {
+	if (notif.type === "NEW_MESSAGE") {
+		try {
+			const payload = JSON.parse(notif.message);
+			if (payload?.from) return `NEW_MESSAGE:${payload.from}`;
+		} catch { /* fall through */ }
+	}
+	return notif.type;
+}
+
 /* ──────────────────────── Component ──────────────────────── */
 
 export default function NotificationPanel() {
@@ -223,6 +263,13 @@ export default function NotificationPanel() {
 	const [loading, setLoading] = useState(true);
 	const panelRef = useRef<HTMLDivElement>(null);
 	const { addToast } = useNotifications();
+	/** Tracks the last toast timestamp per throttle key. */
+	const toastThrottleMap = useRef<Map<string, number>>(new Map());
+
+	/* ── Notification sound ── */
+	const soundEnabled = useNotificationSoundPref();
+	const soundEnabledRef = useRef(soundEnabled);
+	soundEnabledRef.current = soundEnabled;
 
 	const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -230,7 +277,8 @@ export default function NotificationPanel() {
 	const fetchNotifications = useCallback(async () => {
 		try {
 			const res = await getNotifications();
-			setNotifications(res.data.results);
+			// Exclude chat messages — they are handled by the chat unread indicator
+			setNotifications(res.data.results.filter((n) => n.type !== "NEW_MESSAGE"));
 		} catch {
 			// Silently fail — panel shows empty state
 		} finally {
@@ -243,26 +291,48 @@ export default function NotificationPanel() {
 	}, [fetchNotifications]);
 
 	/* ── Real-time via WebSocket ── */
-	useNotificationWebSocket(
-		useCallback(
-			(incoming: ApiNotification) => {
-				// Prepend new notification to the list
+	const handleIncomingNotification = useCallback(
+		async (incoming: ApiNotification) => {
+			// Chat messages don't go in the notification list (handled by chat unread dot)
+			if (incoming.type !== "NEW_MESSAGE") {
 				setNotifications((prev) => {
-					// Avoid duplicates
 					if (prev.some((n) => n.id === incoming.id)) return prev;
 					return [incoming, ...prev];
 				});
+			}
 
-				// Show toast for new notification
-				addToast({
-					type: toastTypeMap[incoming.type] ?? "info",
-					title: formatNotifTitle(incoming.type),
-					message: incoming.message,
-				});
-			},
-			[addToast],
-		),
+			// Throttle toasts per sender/type to avoid flood
+			const key = toastThrottleKey(incoming);
+			const now = Date.now();
+			const lastShown = toastThrottleMap.current.get(key) ?? 0;
+			if (now - lastShown < TOAST_THROTTLE_MS) return;
+			toastThrottleMap.current.set(key, now);
+
+			// Play notification sound if enabled
+			if (soundEnabledRef.current) playNotificationSound();
+
+			// For chat messages, resolve the sender username before showing the toast
+			if (incoming.type === "NEW_MESSAGE") {
+				let senderName = "Someone";
+				try {
+					const { from } = JSON.parse(incoming.message);
+					if (from) senderName = await resolveUsername(from);
+				} catch { /* ignore parse errors */ }
+
+				addToast({ type: "message", title: "New Message", message: `${senderName} sent you a message` });
+				return;
+			}
+
+			addToast({
+				type: toastTypeMap[incoming.type] ?? "info",
+				title: formatNotifTitle(incoming.type),
+				message: incoming.message,
+			});
+		},
+		[addToast],
 	);
+
+	useNotificationWebSocket(handleIncomingNotification);
 
 	/* ── Close on outside click ── */
 	useEffect(() => {

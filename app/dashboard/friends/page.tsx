@@ -149,6 +149,7 @@ interface BlockedUser {
 	userId: string;
 	username: string;
 	avatar: string;
+	avatarUrl: string | null;
 }
 
 /* ──────────────────────── Helpers ──────────────────────── */
@@ -362,9 +363,17 @@ function BlockedCard({
 }) {
 	return (
 		<div className="flex items-center gap-4 rounded-xl border border-white/5 bg-surface-lighter/50 px-4 py-3 transition-all hover:border-white/10 hover:bg-surface-lighter">
-			<div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-red-500/5 text-sm font-bold text-zinc-500">
-				{user.avatar}
-			</div>
+			{user.avatarUrl ? (
+				<img
+					src={user.avatarUrl}
+					alt={user.username}
+					className="h-11 w-11 flex-shrink-0 rounded-full object-cover"
+				/>
+			) : (
+				<div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-red-500/5 text-sm font-bold text-zinc-500">
+					{user.avatar}
+				</div>
+			)}
 			<div className="min-w-0 flex-1">
 				<p className="truncate text-sm font-medium text-zinc-400">{user.username}</p>
 				<p className="text-xs text-zinc-600">Blocked</p>
@@ -523,6 +532,7 @@ export default function FriendsPage() {
 					userId: b.userId,
 					username: b.username,
 					avatar: getInitials(b.username),
+					avatarUrl: b.avatarUrl ?? null,
 				})),
 			);
 		} catch (err) {

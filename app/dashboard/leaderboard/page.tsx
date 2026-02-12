@@ -77,6 +77,7 @@ interface LeaderboardPlayer {
 	rank: number;
 	userId: string;
 	username: string;
+	displayName: string;
 	avatar: string;
 	avatarUrl: string | null;
 	wins: number;
@@ -165,8 +166,9 @@ function PodiumCard({
 
 			{/* Name */}
 			<p className={`mt-2 text-sm font-semibold ${c.textColor}`}>
-				{player.username}
+				{player.displayName}
 			</p>
+			<p className="text-[10px] text-zinc-500">@{player.username}</p>
 			<p className="text-xs text-zinc-500">{player.elo} ELO</p>
 
 			{/* Podium bar */}
@@ -344,12 +346,14 @@ export default function LeaderboardPage() {
 
 			const resolved: LeaderboardPlayer[] = entries.map((entry) => {
 				const profile = userCache.get(entry.userId);
-				const username = profile?.displayName || profile?.username || "Unknown";
+				const displayName = profile?.displayName || profile?.username || "Unknown";
+				const username = profile?.username || "Unknown";
 				return {
 					rank: entry.rank,
 					userId: entry.userId,
 					username,
-					avatar: username.slice(0, 2).toUpperCase(),
+					displayName,
+					avatar: displayName.slice(0, 2).toUpperCase(),
 					avatarUrl: profile?.avatarUrl ?? null,
 					wins: entry.wins,
 					losses: entry.losses,
@@ -406,7 +410,10 @@ export default function LeaderboardPage() {
 
 		if (search.trim()) {
 			const q = search.toLowerCase();
-			data = data.filter((p) => p.username.toLowerCase().includes(q));
+			data = data.filter((p) =>
+				p.displayName.toLowerCase().includes(q) ||
+				p.username.toLowerCase().includes(q),
+			);
 		}
 
 		data.sort((a, b) => {
@@ -659,8 +666,8 @@ export default function LeaderboardPage() {
 											key={player.userId}
 											href={isUser ? "/dashboard/profile" : `/dashboard/player/${player.username}`}
 											className={`flex items-center gap-3 rounded-xl px-3 py-3 transition-all ${isUser
-													? "bg-accent/5 ring-1 ring-accent/20"
-													: "hover:bg-white/[0.03]"
+												? "bg-accent/5 ring-1 ring-accent/20"
+												: "hover:bg-white/[0.03]"
 												}`}
 										>
 											{/* Rank */}
@@ -679,8 +686,8 @@ export default function LeaderboardPage() {
 											) : (
 												<div
 													className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold sm:h-7 sm:w-7 ${isUser
-															? "bg-accent/20 text-accent-light ring-1 ring-accent/30"
-															: "bg-white/5 text-zinc-400"
+														? "bg-accent/20 text-accent-light ring-1 ring-accent/30"
+														: "bg-white/5 text-zinc-400"
 														}`}
 												>
 													{player.avatar}
@@ -693,10 +700,13 @@ export default function LeaderboardPage() {
 													className={`truncate text-sm font-medium ${isUser ? "text-accent-light" : "text-zinc-200"
 														}`}
 												>
-													{player.username}
+													{player.displayName}
 													{isUser && (
 														<span className="ml-1.5 text-xs text-accent/60">(you)</span>
 													)}
+												</p>
+												<p className="truncate text-xs text-zinc-500">
+													@{player.username}
 												</p>
 												{/* Mobile-only stats */}
 												<p className="mt-0.5 text-xs text-zinc-500 sm:hidden">

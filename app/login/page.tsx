@@ -18,7 +18,11 @@ export default function LoginPage() {
 	const [password, setPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState("");
+	const [error, setError] = useState(() => {
+		const err = searchParams.get("error");
+		if (err === "oauth_failed") return "GitHub sign-in failed. Please try again.";
+		return err ? `Authentication error: ${err}` : "";
+	});
 	const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
 	function clearFieldError(field: keyof FieldErrors) {

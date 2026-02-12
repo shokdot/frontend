@@ -1,4 +1,4 @@
-import { getAccessToken, refreshAccessToken, clearAuth } from "./auth";
+import { getAccessToken, refreshAccessToken, clearAuth, RateLimitedError } from "./auth";
 
 interface ApiOptions extends Omit<RequestInit, "headers"> {
 	headers?: Record<string, string>;
@@ -35,14 +35,29 @@ export async function apiFetch<T = unknown>(
 
 	// On 401, try refreshing the token once
 	if (res.status === 401) {
-		token = await refreshAccessToken();
+		try {
+			token = await refreshAccessToken();
+		} catch (err) {
+			if (err instanceof RateLimitedError) {
+				// Rate-limited but session may still be valid — surface as API error, don't redirect.
+				throw new ApiError("Too many requests. Please wait a moment.", 429, "TOO_MANY_REQUESTS");
+			}
+			throw err;
+		}
+
 		if (token) {
 			res = await doFetch(token);
 		} else {
-			clearAuth();
-			window.location.href = "/login";
+			// Refresh failed — session is dead. Redirect once.
+			forceLogoutRedirect();
 			throw new Error("Session expired");
 		}
+	}
+
+	// If the retry *also* returned 401, the token is truly invalid
+	if (res.status === 401) {
+		forceLogoutRedirect();
+		throw new Error("Session expired");
 	}
 
 	const json = await res.json();
@@ -54,6 +69,15 @@ export async function apiFetch<T = unknown>(
 	}
 
 	return json as T;
+}
+
+/** Redirect to /login exactly once per page load. */
+let isRedirecting = false;
+function forceLogoutRedirect() {
+	if (isRedirecting) return;
+	isRedirecting = true;
+	clearAuth();
+	window.location.href = "/login";
 }
 
 export class ApiError extends Error {
@@ -76,6 +100,7 @@ export interface ApiUserProfile {
 	displayName: string | null;
 	bio: string | null;
 	avatarUrl: string | null;
+	theme: "dark" | "light";
 	createdAt: string;
 	updatedAt: string;
 }
@@ -106,6 +131,7 @@ export interface UpdateProfileData {
 	username?: string;
 	displayName?: string;
 	bio?: string;
+	theme?: "dark" | "light";
 }
 
 export function updateMyProfile(data: UpdateProfileData) {
@@ -327,6 +353,7 @@ export function searchUsers(username: string) {
 export interface ApiBlockedUser {
 	userId: string;
 	username: string;
+	avatarUrl: string | null;
 }
 
 interface ListBlockedResponse {
@@ -400,6 +427,29 @@ export function deleteNotification(id: string) {
 	);
 }
 
+/* ───────────── Notification Preferences API ───────────── */
+
+export interface NotificationPreferences {
+	gameInvites: boolean;
+	friendRequests: boolean;
+	matchResults: boolean;
+	systemUpdates: boolean;
+	sounds: boolean;
+}
+
+export function getNotificationPreferences() {
+	return apiFetch<{ status: string; data: NotificationPreferences }>(
+		"/api/v1/notifications/preferences",
+	);
+}
+
+export function updateNotificationPreferences(prefs: Partial<NotificationPreferences>) {
+	return apiFetch<{ status: string; message: string }>(
+		"/api/v1/notifications/preferences",
+		{ method: "PUT", body: JSON.stringify(prefs) },
+	);
+}
+
 /* ───────────── Chat API ───────────── */
 
 export interface ApiConversation {
@@ -435,5 +485,12 @@ interface GetConversationMessagesResponse {
 export function getConversationMessages(userId: string, limit = 100) {
 	return apiFetch<GetConversationMessagesResponse>(
 		`/api/v1/chat/conversations/${encodeURIComponent(userId)}?limit=${limit}`,
+	);
+}
+
+export function deleteConversation(userId: string) {
+	return apiFetch<{ status: string; message: string }>(
+		`/api/v1/chat/conversations/${encodeURIComponent(userId)}`,
+		{ method: "DELETE" },
 	);
 }

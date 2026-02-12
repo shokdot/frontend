@@ -309,6 +309,7 @@ function FriendRow({ friend }: { friend: FriendData }) {
 interface LeaderboardEntry {
 	rank: number;
 	name: string;
+	username: string;
 	avatar: string;
 	avatarUrl: string | null;
 	wins: number;
@@ -326,7 +327,7 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
 
 	return (
 		<Link
-			href={isUser ? "/dashboard/profile" : `/dashboard/player/${entry.name}`}
+			href={isUser ? "/dashboard/profile" : `/dashboard/player/${entry.username}`}
 			className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${isUser
 				? "bg-accent/5 ring-1 ring-accent/20"
 				: "hover:bg-white/5"
@@ -350,13 +351,16 @@ function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
 					{entry.avatar}
 				</div>
 			)}
-			<span
-				className={`flex-1 truncate text-sm font-medium ${isUser ? "text-accent-light" : "text-zinc-300"
-					}`}
-			>
-				{entry.name}
-				{isUser && <span className="ml-1 text-xs text-accent/60">(you)</span>}
-			</span>
+			<div className="min-w-0 flex-1">
+				<p
+					className={`truncate text-sm font-medium ${isUser ? "text-accent-light" : "text-zinc-300"
+						}`}
+				>
+					{entry.name}
+					{isUser && <span className="ml-1 text-xs text-accent/60">(you)</span>}
+				</p>
+				<p className="truncate text-[10px] text-zinc-500">@{entry.username}</p>
+			</div>
 			<span className="text-xs text-zinc-500">{entry.elo} ELO</span>
 		</Link>
 	);
@@ -549,9 +553,11 @@ export default function DashboardPage() {
 				const resolved: LeaderboardEntry[] = entries.map((entry) => {
 					const user = userCache.get(entry.userId);
 					const name = user?.displayName || user?.username || "Unknown";
+					const username = user?.username || "Unknown";
 					return {
 						rank: entry.rank,
 						name,
+						username,
 						avatar: name.slice(0, 2).toUpperCase(),
 						avatarUrl: user?.avatarUrl ?? null,
 						wins: entry.wins,
@@ -659,7 +665,7 @@ export default function DashboardPage() {
 							<StatCard
 								icon={<FlameIcon className="h-5 w-5" />}
 								label="ELO Rating"
-								value={String(stats?.elo ?? 1000)}
+								value={String(stats?.elo ?? 0)}
 								glowColor="pink"
 							/>
 						</>

@@ -4,9 +4,17 @@ import type { NextRequest } from "next/server";
 const protectedRoutes = ["/dashboard"];
 const authRoutes = ["/login", "/register", "/forgot-password", "/reset-password"];
 
+/** Routes that should always be accessible regardless of auth state (e.g. OAuth callback). */
+const publicRoutes = ["/auth/callback"];
+
 export function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 	const isAuthenticated = request.cookies.has("logged_in");
+
+	// Always allow public routes (OAuth callback, etc.)
+	if (publicRoutes.some((route) => pathname.startsWith(route))) {
+		return NextResponse.next();
+	}
 
 	const isProtectedRoute = protectedRoutes.some((route) =>
 		pathname.startsWith(route),
@@ -37,5 +45,6 @@ export const config = {
 		"/register",
 		"/forgot-password",
 		"/reset-password",
+		"/auth/callback",
 	],
 };

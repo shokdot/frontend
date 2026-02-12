@@ -8,7 +8,10 @@ import {
 	updateAvatar,
 	fileToBase64,
 	ApiUserProfile,
+	getNotificationPreferences,
+	updateNotificationPreferences,
 } from "@/lib/api";
+import { setNotificationSoundPref } from "@/lib/useNotificationSoundPref";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -46,15 +49,6 @@ function GamepadIcon({ className }: { className?: string }) {
 			<path d="M4 12h4" />
 			<circle cx="17" cy="10" r="1" fill="currentColor" />
 			<circle cx="19" cy="12" r="1" fill="currentColor" />
-		</svg>
-	);
-}
-
-function EyeIcon({ className }: { className?: string }) {
-	return (
-		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-			<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-			<circle cx="12" cy="12" r="3" />
 		</svg>
 	);
 }
@@ -142,7 +136,7 @@ function SettingsGearIcon({ className }: { className?: string }) {
 
 /* ──────────────────────── Types ──────────────────────── */
 
-type SettingsTab = "account" | "security" | "notifications" | "game" | "appearance" | "privacy";
+type SettingsTab = "account" | "security" | "notifications" | "game" | "appearance";
 
 /* ──────────────────────── Toggle Switch ──────────────────────── */
 
@@ -366,35 +360,59 @@ export default function SettingsPage() {
 	const [notifySystemUpdates, setNotifySystemUpdates] = useState(false);
 	const [notifySounds, setNotifySounds] = useState(true);
 
+	const loadPreferences = useCallback(async () => {
+		try {
+			const res = await getNotificationPreferences();
+			setNotifyGameInvites(res.data.gameInvites);
+			setNotifyFriendRequests(res.data.friendRequests);
+			setNotifyMatchResults(res.data.matchResults);
+			setNotifySystemUpdates(res.data.systemUpdates);
+			setNotifySounds(res.data.sounds);
+			// Sync sound preference to localStorage for the NotificationPanel
+			setNotificationSoundPref(res.data.sounds);
+		} catch {
+			// Keep defaults on failure
+		}
+	}, []);
+
+	useEffect(() => {
+		loadPreferences();
+	}, [loadPreferences]);
+
 	/* Game */
 	const [paddleColor, setPaddleColor] = useState("#00f0ff");
 	const [ballTrail, setBallTrail] = useState(true);
 	const [screenShake, setScreenShake] = useState(true);
 	const [powerUps, setPowerUps] = useState(true);
 
-	/* Privacy */
-	const [profilePublic, setProfilePublic] = useState(true);
-	const [showOnlineStatus, setShowOnlineStatus] = useState(true);
-	const [showMatchHistory, setShowMatchHistory] = useState(true);
-	const [allowFriendRequests, setAllowFriendRequests] = useState(true);
-
 	async function handleSave() {
 		setIsSaving(true);
 		setSaveError(null);
 
 		try {
-			await updateMyProfile({
-				displayName: displayName || undefined,
-				username: username || undefined,
-				bio: bio || undefined,
-			});
+			await Promise.all([
+				updateMyProfile({
+					displayName: displayName || undefined,
+					username: username || undefined,
+					bio: bio || undefined,
+				}),
+				updateNotificationPreferences({
+					gameInvites: notifyGameInvites,
+					friendRequests: notifyFriendRequests,
+					matchResults: notifyMatchResults,
+					systemUpdates: notifySystemUpdates,
+					sounds: notifySounds,
+				}),
+			]);
+			// Sync sound preference to localStorage immediately
+			setNotificationSoundPref(notifySounds);
 			// Refresh profile data to stay in sync
 			await loadProfile();
 			setSaved(true);
 			setTimeout(() => setSaved(false), 2000);
 		} catch (err: unknown) {
 			const message =
-				err instanceof Error ? err.message : "Failed to save profile";
+				err instanceof Error ? err.message : "Failed to save settings";
 			setSaveError(message);
 			setTimeout(() => setSaveError(null), 4000);
 		} finally {
@@ -408,7 +426,6 @@ export default function SettingsPage() {
 		{ id: "notifications", label: "Notifications", icon: BellIcon },
 		{ id: "game", label: "Game", icon: GamepadIcon },
 		{ id: "appearance", label: "Appearance", icon: PaletteIcon },
-		{ id: "privacy", label: "Privacy", icon: EyeIcon },
 	];
 
 	const paddleColors = [
@@ -444,7 +461,7 @@ export default function SettingsPage() {
 								Settings
 							</h1>
 							<p className="mt-0.5 text-sm text-zinc-400">
-								Manage your account, preferences and privacy
+								Manage your account and preferences
 							</p>
 						</div>
 					</div>
@@ -674,6 +691,27 @@ export default function SettingsPage() {
 										>
 											{githubLinked ? "Disconnect" : "Connect"}
 										</button>
+									</div>
+								</SettingsSection>
+
+								<SettingsSection title="Danger Zone">
+									<div className="rounded-xl border border-red-500/15 bg-red-500/5 p-4">
+										<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+											<div className="flex items-start gap-3">
+												<TrashIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-400" />
+												<div>
+													<p className="text-sm font-medium text-red-400">
+														Delete Account
+													</p>
+													<p className="mt-0.5 text-xs text-zinc-400">
+														Permanently delete your account and all associated data. This action cannot be undone.
+													</p>
+												</div>
+											</div>
+											<button className="flex-shrink-0 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20">
+												Delete Account
+											</button>
+										</div>
 									</div>
 								</SettingsSection>
 							</>
@@ -917,80 +955,6 @@ export default function SettingsPage() {
 												Clean and bright for daytime use
 											</p>
 										</button>
-									</div>
-								</SettingsSection>
-							</>
-						)}
-
-						{/* ─── Privacy ─── */}
-						{activeTab === "privacy" && (
-							<>
-								<SettingsSection
-									title="Profile Visibility"
-									description="Control who can see your information"
-								>
-									<div>
-										<SettingRow
-											label="Public Profile"
-											description="Allow other players to view your profile"
-										>
-											<Toggle
-												enabled={profilePublic}
-												onChange={setProfilePublic}
-												color="accent"
-											/>
-										</SettingRow>
-										<SettingRow
-											label="Show Online Status"
-											description="Let others see when you are online"
-										>
-											<Toggle
-												enabled={showOnlineStatus}
-												onChange={setShowOnlineStatus}
-												color="accent"
-											/>
-										</SettingRow>
-										<SettingRow
-											label="Show Match History"
-											description="Allow others to see your match history on your profile"
-										>
-											<Toggle
-												enabled={showMatchHistory}
-												onChange={setShowMatchHistory}
-												color="accent"
-											/>
-										</SettingRow>
-										<SettingRow
-											label="Allow Friend Requests"
-											description="Let other players send you friend requests"
-										>
-											<Toggle
-												enabled={allowFriendRequests}
-												onChange={setAllowFriendRequests}
-												color="accent"
-											/>
-										</SettingRow>
-									</div>
-								</SettingsSection>
-
-								<SettingsSection title="Danger Zone">
-									<div className="rounded-xl border border-red-500/15 bg-red-500/5 p-4">
-										<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-											<div className="flex items-start gap-3">
-												<TrashIcon className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-400" />
-												<div>
-													<p className="text-sm font-medium text-red-400">
-														Delete Account
-													</p>
-													<p className="mt-0.5 text-xs text-zinc-400">
-														Permanently delete your account and all associated data. This action cannot be undone.
-													</p>
-												</div>
-											</div>
-											<button className="flex-shrink-0 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20">
-												Delete Account
-											</button>
-										</div>
 									</div>
 								</SettingsSection>
 							</>

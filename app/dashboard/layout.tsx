@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import NotificationPanel from "../components/NotificationPanel";
 import StatusProvider, { mapBackendStatus } from "../components/StatusProvider";
-import ChatProvider from "../components/ChatProvider";
+import ChatProvider, { useChat } from "../components/ChatProvider";
 import { useTheme } from "../components/ThemeProvider";
-import { clearAuth } from "@/lib/auth";
+import { clearAuth, getAccessToken } from "@/lib/auth";
 import { getMyProfile, ApiUserProfile, searchUsers, ApiSearchResult } from "@/lib/api";
 
 /* ──────────────────────── Icons ──────────────────────── */
@@ -175,6 +175,17 @@ const navItems = [
 	{ label: "Settings", href: "/dashboard/settings", icon: SettingsIcon },
 ];
 
+/* ──────────────────── Chat Unread Dot ──────────────────── */
+
+/** Small glowing dot on the Chat icon when there are unread messages. Must be rendered inside ChatProvider. */
+function ChatUnreadDot() {
+	const { unreadCount } = useChat();
+	if (unreadCount === 0) return null;
+	return (
+		<span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-neon-pink shadow-[0_0_6px_rgba(224,64,251,0.8)]" />
+	);
+}
+
 /* ──────────────────────── Layout ──────────────────────── */
 
 export default function DashboardLayout({
@@ -269,9 +280,11 @@ export default function DashboardLayout({
 
 	async function handleLogout() {
 		try {
+			const token = getAccessToken();
 			await fetch("/api/v1/auth/logout", {
 				method: "POST",
 				credentials: "include",
+				headers: token ? { Authorization: `Bearer ${token}` } : {},
 			});
 		} finally {
 			clearAuth();
@@ -282,199 +295,203 @@ export default function DashboardLayout({
 	return (
 		<StatusProvider>
 			<ChatProvider>
-			<div className="flex min-h-screen">
-				{/* ── Mobile overlay ── */}
-				{sidebarOpen && (
-					<div
-						className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
-						onClick={() => setSidebarOpen(false)}
-					/>
-				)}
-
-				{/* ── Sidebar ── */}
-				<aside
-					className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-white/5 bg-surface-light transition-transform duration-300 lg:static lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
-						}`}
-				>
-					{/* Sidebar header */}
-					<div className="flex h-16 items-center justify-between border-b border-white/5 px-5">
-						<Link href="/dashboard" className="flex items-center gap-2.5">
-							<LogoIcon />
-							<span className="text-lg font-bold text-white">iPong</span>
-						</Link>
-						<button
+				<div className="flex min-h-screen">
+					{/* ── Mobile overlay ── */}
+					{sidebarOpen && (
+						<div
+							className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
 							onClick={() => setSidebarOpen(false)}
-							className="text-zinc-400 hover:text-white lg:hidden"
-						>
-							<CloseIcon className="h-5 w-5" />
-						</button>
-					</div>
+						/>
+					)}
 
-					{/* Nav links */}
-					<nav className="flex-1 overflow-y-auto px-3 py-4">
-						<ul className="space-y-1">
-							{navItems.map((item) => {
-								const isActive = pathname === item.href;
-								return (
-									<li key={item.href}>
-										<Link
-											href={item.href}
-											className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${isActive
-												? "bg-accent/10 text-accent-light shadow-[inset_0_0_20px_rgba(139,92,246,0.05)]"
-												: "text-zinc-400 hover:bg-white/5 hover:text-white"
-												}`}
-										>
-											<item.icon className={`h-5 w-5 flex-shrink-0 ${isActive ? "text-accent-light" : ""}`} />
-											{item.label}
-											{isActive && (
-												<div className="ml-auto h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_6px_rgba(139,92,246,0.8)]" />
-											)}
-										</Link>
-									</li>
-								);
-							})}
-						</ul>
-					</nav>
-
-					{/* Sidebar footer */}
-					<div className="border-t border-white/5 p-3">
-						<button
-							onClick={handleLogout}
-							className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 transition-all hover:bg-red-500/10 hover:text-red-400"
-						>
-							<LogoutIcon className="h-5 w-5" />
-							Log out
-						</button>
-					</div>
-				</aside>
-
-				{/* ── Main area ── */}
-				<div className="flex flex-1 flex-col">
-					{/* Top bar */}
-					<header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-white/5 bg-surface/80 px-4 backdrop-blur-xl sm:px-6">
-						{/* Left: hamburger + breadcrumb */}
-						<div className="flex items-center gap-3">
-							<button
-								onClick={() => setSidebarOpen(true)}
-								className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white lg:hidden"
-							>
-								<MenuIcon className="h-5 w-5" />
-							</button>
-							<h2 className="hidden text-sm font-semibold text-white capitalize sm:block">
-								{pathname === "/dashboard"
-									? "Dashboard"
-									: pathname.split("/").pop()?.replace(/-/g, " ") || "Dashboard"}
-							</h2>
-						</div>
-
-						{/* Center: search bar */}
-						<div ref={searchRef} className="relative flex-1 max-w-md mx-auto">
-							<SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-							<input
-								type="text"
-								placeholder="Search players..."
-								value={searchQuery}
-								onChange={(e) => {
-									setSearchQuery(e.target.value);
-									setSearchOpen(true);
-								}}
-								onFocus={() => setSearchOpen(true)}
-								className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2 pl-10 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
-							/>
-
-							{/* Search dropdown */}
-							{searchOpen && searchQuery.trim() && (
-								<div className="absolute top-full left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-xl border border-white/5 bg-surface-light shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
-									{searchLoading ? (
-										<div className="px-4 py-6 text-center">
-											<p className="text-sm text-zinc-500">Searching...</p>
-										</div>
-									) : searchResults.length > 0 ? (
-										<div className="py-1">
-											{searchResults.map((player) => (
-												<button
-													key={player.userId}
-													onClick={() => {
-														router.push(`/dashboard/player/${player.username}`);
-														setSearchOpen(false);
-														setSearchQuery("");
-													}}
-													className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
-												>
-													<div className="relative flex-shrink-0">
-														{player.avatarUrl ? (
-															<img
-																src={player.avatarUrl}
-																alt={player.username}
-																className="h-8 w-8 rounded-full object-cover"
-															/>
-														) : (
-															<div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-xs font-bold text-zinc-400">
-																{player.username.slice(0, 2).toUpperCase()}
-															</div>
-														)}
-														<span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface-light ${statusDot[mapBackendStatus(player.status)]}`} />
-													</div>
-													<div className="min-w-0 flex-1">
-														<p className="truncate text-sm font-medium text-zinc-200">
-															{player.username}
-														</p>
-														<p className="text-xs text-zinc-500 capitalize">{mapBackendStatus(player.status)}</p>
-													</div>
-												</button>
-											))}
-										</div>
-									) : (
-										<div className="px-4 py-6 text-center">
-											<p className="text-sm text-zinc-500">No players found</p>
-										</div>
-									)}
-								</div>
-							)}
-						</div>
-
-						{/* Right: theme toggle + notifications + avatar */}
-						<div className="flex items-center gap-2">
-							<button
-								onClick={toggleTheme}
-								className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
-								title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-							>
-								{theme === "dark" ? (
-									<SunIcon className="h-4.5 w-4.5" />
-								) : (
-									<MoonIcon className="h-4.5 w-4.5" />
-								)}
-							</button>
-							<NotificationPanel />
-							<Link
-								href="/dashboard/profile"
-								className="ml-1 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-accent/20 text-sm font-bold text-accent-light ring-2 ring-accent/30 transition-all hover:ring-accent/60"
-							>
-								{profile?.avatarUrl ? (
-									<img
-										src={profile.avatarUrl}
-										alt={profile.displayName || profile.username}
-										className="h-full w-full object-cover"
-									/>
-								) : (
-									(profile?.displayName || profile?.username || "U")
-										.split(" ")
-										.map((w) => w[0])
-										.join("")
-										.toUpperCase()
-										.slice(0, 2)
-								)}
+					{/* ── Sidebar ── */}
+					<aside
+						className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-white/5 bg-surface-light transition-transform duration-300 lg:static lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+							}`}
+					>
+						{/* Sidebar header */}
+						<div className="flex h-16 items-center justify-between border-b border-white/5 px-5">
+							<Link href="/dashboard" className="flex items-center gap-2.5">
+								<LogoIcon />
+								<span className="text-lg font-bold text-white">iPong</span>
 							</Link>
+							<button
+								onClick={() => setSidebarOpen(false)}
+								className="text-zinc-400 hover:text-white lg:hidden"
+							>
+								<CloseIcon className="h-5 w-5" />
+							</button>
 						</div>
-					</header>
 
-					{/* Page content */}
-					<main className="flex-1 overflow-y-auto">
-						{children}
-					</main>
+						{/* Nav links */}
+						<nav className="flex-1 overflow-y-auto px-3 py-4">
+							<ul className="space-y-1">
+								{navItems.map((item) => {
+									const isActive = pathname === item.href;
+									const isChatLink = item.href === "/dashboard/chat";
+									return (
+										<li key={item.href}>
+											<Link
+												href={item.href}
+												className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${isActive
+													? "bg-accent/10 text-accent-light shadow-[inset_0_0_20px_rgba(139,92,246,0.05)]"
+													: "text-zinc-400 hover:bg-white/5 hover:text-white"
+													}`}
+											>
+												<span className="relative flex-shrink-0">
+													<item.icon className={`h-5 w-5 ${isActive ? "text-accent-light" : ""}`} />
+													{isChatLink && <ChatUnreadDot />}
+												</span>
+												{item.label}
+												{isActive && (
+													<div className="ml-auto h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_6px_rgba(139,92,246,0.8)]" />
+												)}
+											</Link>
+										</li>
+									);
+								})}
+							</ul>
+						</nav>
+
+						{/* Sidebar footer */}
+						<div className="border-t border-white/5 p-3">
+							<button
+								onClick={handleLogout}
+								className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 transition-all hover:bg-red-500/10 hover:text-red-400"
+							>
+								<LogoutIcon className="h-5 w-5" />
+								Log out
+							</button>
+						</div>
+					</aside>
+
+					{/* ── Main area ── */}
+					<div className="flex flex-1 flex-col">
+						{/* Top bar */}
+						<header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-white/5 bg-surface/80 px-4 backdrop-blur-xl sm:px-6">
+							{/* Left: hamburger + breadcrumb */}
+							<div className="flex items-center gap-3">
+								<button
+									onClick={() => setSidebarOpen(true)}
+									className="rounded-lg p-1.5 text-zinc-400 hover:bg-white/5 hover:text-white lg:hidden"
+								>
+									<MenuIcon className="h-5 w-5" />
+								</button>
+								<h2 className="hidden text-sm font-semibold text-white capitalize sm:block">
+									{pathname === "/dashboard"
+										? "Dashboard"
+										: pathname.split("/").pop()?.replace(/-/g, " ") || "Dashboard"}
+								</h2>
+							</div>
+
+							{/* Center: search bar */}
+							<div ref={searchRef} className="relative flex-1 max-w-md mx-auto">
+								<SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+								<input
+									type="text"
+									placeholder="Search players..."
+									value={searchQuery}
+									onChange={(e) => {
+										setSearchQuery(e.target.value);
+										setSearchOpen(true);
+									}}
+									onFocus={() => setSearchOpen(true)}
+									className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2 pl-10 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/20"
+								/>
+
+								{/* Search dropdown */}
+								{searchOpen && searchQuery.trim() && (
+									<div className="absolute top-full left-0 right-0 z-50 mt-1.5 overflow-hidden rounded-xl border border-white/5 bg-surface-light shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
+										{searchLoading ? (
+											<div className="px-4 py-6 text-center">
+												<p className="text-sm text-zinc-500">Searching...</p>
+											</div>
+										) : searchResults.length > 0 ? (
+											<div className="py-1">
+												{searchResults.map((player) => (
+													<button
+														key={player.userId}
+														onClick={() => {
+															router.push(`/dashboard/player/${player.username}`);
+															setSearchOpen(false);
+															setSearchQuery("");
+														}}
+														className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+													>
+														<div className="relative flex-shrink-0">
+															{player.avatarUrl ? (
+																<img
+																	src={player.avatarUrl}
+																	alt={player.username}
+																	className="h-8 w-8 rounded-full object-cover"
+																/>
+															) : (
+																<div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-xs font-bold text-zinc-400">
+																	{player.username.slice(0, 2).toUpperCase()}
+																</div>
+															)}
+															<span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface-light ${statusDot[mapBackendStatus(player.status)]}`} />
+														</div>
+														<div className="min-w-0 flex-1">
+															<p className="truncate text-sm font-medium text-zinc-200">
+																{player.username}
+															</p>
+															<p className="text-xs text-zinc-500 capitalize">{mapBackendStatus(player.status)}</p>
+														</div>
+													</button>
+												))}
+											</div>
+										) : (
+											<div className="px-4 py-6 text-center">
+												<p className="text-sm text-zinc-500">No players found</p>
+											</div>
+										)}
+									</div>
+								)}
+							</div>
+
+							{/* Right: theme toggle + notifications + avatar */}
+							<div className="flex items-center gap-2">
+								<button
+									onClick={toggleTheme}
+									className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
+									title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+								>
+									{theme === "dark" ? (
+										<SunIcon className="h-4.5 w-4.5" />
+									) : (
+										<MoonIcon className="h-4.5 w-4.5" />
+									)}
+								</button>
+								<NotificationPanel />
+								<Link
+									href="/dashboard/profile"
+									className="ml-1 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-accent/20 text-sm font-bold text-accent-light ring-2 ring-accent/30 transition-all hover:ring-accent/60"
+								>
+									{profile?.avatarUrl ? (
+										<img
+											src={profile.avatarUrl}
+											alt={profile.displayName || profile.username}
+											className="h-full w-full object-cover"
+										/>
+									) : (
+										(profile?.displayName || profile?.username || "U")
+											.split(" ")
+											.map((w) => w[0])
+											.join("")
+											.toUpperCase()
+											.slice(0, 2)
+									)}
+								</Link>
+							</div>
+						</header>
+
+						{/* Page content */}
+						<main className="flex-1 overflow-y-auto">
+							{children}
+						</main>
+					</div>
 				</div>
-			</div>
 			</ChatProvider>
 		</StatusProvider>
 	);
