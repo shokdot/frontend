@@ -101,6 +101,7 @@ export interface ApiUserProfile {
 	bio: string | null;
 	avatarUrl: string | null;
 	theme: "dark" | "light";
+	paddleColor: string;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -132,6 +133,7 @@ export interface UpdateProfileData {
 	displayName?: string;
 	bio?: string;
 	theme?: "dark" | "light";
+	paddleColor?: string;
 }
 
 export function updateMyProfile(data: UpdateProfileData) {
