@@ -336,3 +336,34 @@ body {
 		width: 0%;
 	}
 }
+
+/* ── Game countdown pulse ── */
+
+@keyframes countdownPop {
+	0% {
+		opacity: 0;
+		transform: scale(2.2);
+	}
+
+	30% {
+		opacity: 1;
+		transform: scale(0.95);
+	}
+
+	50% {
+		transform: scale(1.05);
+	}
+
+	70% {
+		transform: scale(1);
+	}
+
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.animate-ping-once {
+	animation: countdownPop 0.6s ease-out forwards;
+}

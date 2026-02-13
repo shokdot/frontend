@@ -97,10 +97,18 @@ export default function StatusProvider({
 		const token = getAccessToken();
 		if (!token) return;
 
-		// Close existing connection
+		// Close existing connection gracefully
 		if (wsRef.current) {
-			wsRef.current.onclose = null;
-			wsRef.current.close();
+			const old = wsRef.current;
+			old.onclose = null;
+			old.onerror = null;
+			old.onmessage = null;
+			old.onopen = null;
+			if (old.readyState === WebSocket.OPEN) {
+				old.close();
+			} else if (old.readyState === WebSocket.CONNECTING) {
+				old.addEventListener("open", () => old.close(), { once: true });
+			}
 		}
 
 		// Clear stale statuses — events may have been missed while disconnected
@@ -169,8 +177,16 @@ export default function StatusProvider({
 		return () => {
 			if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
 			if (wsRef.current) {
-				wsRef.current.onclose = null;
-				wsRef.current.close();
+				const ws = wsRef.current;
+				ws.onclose = null;
+				ws.onerror = null;
+				ws.onmessage = null;
+				ws.onopen = null;
+				if (ws.readyState === WebSocket.OPEN) {
+					ws.close();
+				} else if (ws.readyState === WebSocket.CONNECTING) {
+					ws.addEventListener("open", () => ws.close(), { once: true });
+				}
 			}
 		};
 	}, [connect]);

@@ -282,6 +282,27 @@ export function getMatchHistory(
 	);
 }
 
+/* ───────────── Matchmaking API ───────────── */
+
+interface EnterQueueResponse {
+	status: string;
+	data: { matched: boolean; roomId: string | null };
+	message: string;
+}
+
+export function enterMatchmakingQueue() {
+	return apiFetch<EnterQueueResponse>("/api/v1/rooms/matchmaking/queue", {
+		method: "POST",
+	});
+}
+
+export function leaveMatchmakingQueue() {
+	return apiFetch<{ status: string; message: string }>(
+		"/api/v1/rooms/matchmaking/queue",
+		{ method: "DELETE" },
+	);
+}
+
 /* ───────────── AI Match API ───────────── */
 
 interface RecordAIMatchResponse {

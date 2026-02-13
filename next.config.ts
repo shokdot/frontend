@@ -25,9 +25,11 @@ const nextConfig: NextConfig = {
 	async rewrites() {
 		const authUrl = baseUrl(process.env.AUTH_SERVICE_URL || "http://auth-service:3000");
 		const userUrl = baseUrl(process.env.USER_SERVICE_URL || "http://user-service:3001");
+		const notificationUrl = baseUrl(process.env.NOTIFICATION_SERVICE_URL || "http://notification-service:3002");
+		const gameUrl = baseUrl(process.env.GAME_SERVICE_URL || "http://game-service:3003");
+		const roomUrl = baseUrl(process.env.ROOM_SERVICE_URL || "http://room-service:3004");
 		const statsUrl = baseUrl(process.env.STATS_SERVICE_URL || "http://stats-service:3005");
 		const chatUrl = baseUrl(process.env.CHAT_SERVICE_URL || "http://chat-service:3006");
-		const notificationUrl = baseUrl(process.env.NOTIFICATION_SERVICE_URL || "http://notification-service:3002");
 
 		return [
 			{
@@ -39,16 +41,24 @@ const nextConfig: NextConfig = {
 				destination: `${userUrl}/api/v1/users/:path*`,
 			},
 			{
+				source: "/api/v1/notifications/:path*",
+				destination: `${notificationUrl}/api/v1/notifications/:path*`,
+			},
+			{
+				source: "/api/v1/games/:path*",
+				destination: `${gameUrl}/api/v1/games/:path*`,
+			},
+			{
+				source: "/api/v1/rooms/:path*",
+				destination: `${roomUrl}/api/v1/rooms/:path*`,
+			},
+			{
 				source: "/api/v1/stats/:path*",
 				destination: `${statsUrl}/api/v1/stats/:path*`,
 			},
 			{
 				source: "/api/v1/chat/:path*",
 				destination: `${chatUrl}/api/v1/chat/:path*`,
-			},
-			{
-				source: "/api/v1/notifications/:path*",
-				destination: `${notificationUrl}/api/v1/notifications/:path*`,
 			},
 		];
 	},

@@ -120,6 +120,15 @@ const toastTypeMap: Record<string, "success" | "error" | "info" | "warning"> = {
 	system: "warning",
 };
 
+/* ── Notification types that are internal / transient — never shown in list or toast ── */
+const SILENT_TYPES = new Set([
+	"ROOM_CREATED",
+	"ROOM_UPDATED",
+	"ROOM_DELETED",
+	"MATCH_FOUND",
+	"MATCHMAKING_TIMEOUT",
+]);
+
 /* ──────────────────────── Helpers ──────────────────────── */
 
 function getKindStyle(type: string) {
@@ -133,6 +142,17 @@ function formatNotifTitle(type: string): string {
 		case "match_result": return "Match Result";
 		case "NEW_MESSAGE": return "New Message";
 		default: return "Notification";
+	}
+}
+
+/** Safely convert a notification message to a renderable string. */
+function safeMessage(msg: unknown): string {
+	if (typeof msg === "string") return msg;
+	if (msg == null) return "";
+	try {
+		return JSON.stringify(msg);
+	} catch {
+		return String(msg);
 	}
 }
 
@@ -192,10 +212,18 @@ function useNotificationWebSocket(
 		const token = getAccessToken();
 		if (!token) return;
 
-		// Close existing connection
+		// Close existing connection gracefully
 		if (wsRef.current) {
-			wsRef.current.onclose = null;
-			wsRef.current.close();
+			const old = wsRef.current;
+			old.onclose = null;
+			old.onerror = null;
+			old.onmessage = null;
+			old.onopen = null;
+			if (old.readyState === WebSocket.OPEN) {
+				old.close();
+			} else if (old.readyState === WebSocket.CONNECTING) {
+				old.addEventListener("open", () => old.close(), { once: true });
+			}
 		}
 
 		const ws = new WebSocket(buildWsUrl("/api/v1/notifications/ws", token));
@@ -228,8 +256,16 @@ function useNotificationWebSocket(
 		return () => {
 			if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
 			if (wsRef.current) {
-				wsRef.current.onclose = null;
-				wsRef.current.close();
+				const ws = wsRef.current;
+				ws.onclose = null;
+				ws.onerror = null;
+				ws.onmessage = null;
+				ws.onopen = null;
+				if (ws.readyState === WebSocket.OPEN) {
+					ws.close();
+				} else if (ws.readyState === WebSocket.CONNECTING) {
+					ws.addEventListener("open", () => ws.close(), { once: true });
+				}
 			}
 		};
 	}, [connect]);
@@ -277,8 +313,12 @@ export default function NotificationPanel() {
 	const fetchNotifications = useCallback(async () => {
 		try {
 			const res = await getNotifications();
-			// Exclude chat messages — they are handled by the chat unread indicator
-			setNotifications(res.data.results.filter((n) => n.type !== "NEW_MESSAGE"));
+			// Exclude chat messages and internal/transient types from the panel
+			setNotifications(
+				res.data.results.filter(
+					(n) => n.type !== "NEW_MESSAGE" && !SILENT_TYPES.has(n.type)
+				)
+			);
 		} catch {
 			// Silently fail — panel shows empty state
 		} finally {
@@ -293,11 +333,39 @@ export default function NotificationPanel() {
 	/* ── Real-time via WebSocket ── */
 	const handleIncomingNotification = useCallback(
 		async (incoming: ApiNotification) => {
+			// MATCH_FOUND: dispatch navigation event and bail — no toast / list entry.
+			if (incoming.type === "MATCH_FOUND") {
+				try {
+					const payload = typeof incoming.message === "string"
+						? JSON.parse(incoming.message)
+						: incoming.message;
+					window.dispatchEvent(
+						new CustomEvent("matchFound", { detail: payload })
+					);
+				} catch { /* ignore parse errors */ }
+				return;
+			}
+
+			// MATCHMAKING_TIMEOUT: show a friendly toast only.
+			if (incoming.type === "MATCHMAKING_TIMEOUT") {
+				addToast({ type: "warning", title: "Matchmaking", message: "No match found. Please try again." });
+				return;
+			}
+
+			// All other internal / transient types — silently ignore.
+			if (SILENT_TYPES.has(incoming.type)) {
+				return;
+			}
+
 			// Chat messages don't go in the notification list (handled by chat unread dot)
 			if (incoming.type !== "NEW_MESSAGE") {
 				setNotifications((prev) => {
-					if (prev.some((n) => n.id === incoming.id)) return prev;
-					return [incoming, ...prev];
+					if (incoming.id && prev.some((n) => n.id === incoming.id)) return prev;
+					// WebSocket pushes may lack an `id`; assign a client-side one
+					const withId = incoming.id
+						? incoming
+						: { ...incoming, id: `ws-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
+					return [withId, ...prev];
 				});
 			}
 
@@ -326,7 +394,7 @@ export default function NotificationPanel() {
 			addToast({
 				type: toastTypeMap[incoming.type] ?? "info",
 				title: formatNotifTitle(incoming.type),
-				message: incoming.message,
+				message: safeMessage(incoming.message),
 			});
 		},
 		[addToast],
@@ -464,7 +532,7 @@ export default function NotificationPanel() {
 												{formatNotifTitle(notif.type)}
 											</p>
 											<p className="mt-0.5 text-xs text-zinc-500 line-clamp-2">
-												{notif.message}
+												{safeMessage(notif.message)}
 											</p>
 											<p className="mt-1 text-[11px] text-zinc-600">
 												{timeAgo(notif.createdAt)}

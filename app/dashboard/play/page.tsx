@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { enterMatchmakingQueue, leaveMatchmakingQueue } from "@/lib/api";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -72,22 +73,6 @@ function UsersIcon({ className }: { className?: string }) {
 	);
 }
 
-function TournamentIcon({ className }: { className?: string }) {
-	return (
-		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-			<path d="M3 3v6h6" />
-			<path d="M3 9l4-4" />
-			<path d="M21 3v6h-6" />
-			<path d="M21 9l-4-4" />
-			<path d="M3 21v-6h6" />
-			<path d="M3 15l4 4" />
-			<path d="M21 21v-6h-6" />
-			<path d="M21 15l-4 4" />
-			<circle cx="12" cy="12" r="3" />
-		</svg>
-	);
-}
-
 function ArrowRightIcon({ className }: { className?: string }) {
 	return (
 		<svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -140,7 +125,7 @@ interface GameMode {
 	title: string;
 	description: string;
 	icon: React.ComponentType<{ className?: string }>;
-	color: "cyan" | "purple" | "pink" | "amber" | "emerald";
+	color: "cyan" | "purple" | "pink" | "amber";
 	tags: string[];
 }
 
@@ -195,18 +180,6 @@ const colorMap = {
 		badge: "bg-amber-500/10 text-amber-400",
 		btn: "bg-amber-500 text-surface shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_35px_rgba(245,158,11,0.6)]",
 	},
-	emerald: {
-		iconBg: "bg-emerald-500/10 text-emerald-400",
-		border: "border-emerald-500/15",
-		borderHover: "hover:border-emerald-500/30",
-		glow: "hover:shadow-[0_0_30px_rgba(52,211,153,0.08)]",
-		activeRing: "ring-emerald-500/40",
-		activeBg: "bg-emerald-500/5",
-		activeBorder: "border-emerald-500/30",
-		activeGlow: "shadow-[0_0_30px_rgba(52,211,153,0.1)]",
-		badge: "bg-emerald-500/10 text-emerald-400",
-		btn: "bg-emerald-500 text-surface shadow-[0_0_20px_rgba(52,211,153,0.4)] hover:shadow-[0_0_35px_rgba(52,211,153,0.6)]",
-	},
 };
 
 const gameModes: GameMode[] = [
@@ -242,14 +215,6 @@ const gameModes: GameMode[] = [
 		color: "amber",
 		tags: ["Custom", "Invite"],
 	},
-	{
-		id: "tournament",
-		title: "Tournament",
-		description: "Compete in a bracket-style tournament. Last one standing wins it all.",
-		icon: TournamentIcon,
-		color: "emerald",
-		tags: ["Competitive", "Bracket"],
-	},
 ];
 
 /* ──────────────────────── Game Mode Card ──────────────────────── */
@@ -270,8 +235,8 @@ function GameModeCard({
 		<button
 			onClick={onSelect}
 			className={`group relative w-full rounded-2xl border p-5 text-left transition-all duration-300 sm:p-6 ${isSelected
-					? `${c.activeBorder} ${c.activeBg} ${c.activeGlow} ring-1 ${c.activeRing}`
-					: `border-white/5 bg-surface-light ${c.borderHover} ${c.glow}`
+				? `${c.activeBorder} ${c.activeBg} ${c.activeGlow} ring-1 ${c.activeRing}`
+				: `border-white/5 bg-surface-light ${c.borderHover} ${c.glow}`
 				}`}
 		>
 			{/* Selected indicator */}
@@ -330,8 +295,8 @@ function AIOptions({
 						key={d.id}
 						onClick={() => onDifficultyChange(d.id)}
 						className={`rounded-xl border px-4 py-3 text-left transition-all ${difficulty === d.id
-								? d.activeColor
-								: "border-white/5 bg-surface-lighter/50 hover:border-white/10"
+							? d.activeColor
+							: "border-white/5 bg-surface-lighter/50 hover:border-white/10"
 							}`}
 					>
 						<p className={`text-sm font-semibold ${difficulty === d.id ? d.color : "text-zinc-300"}`}>
@@ -389,10 +354,14 @@ function LocalOptions() {
 
 function OnlineOptions({
 	isSearching,
+	searchError,
+	searchTime,
 	onSearch,
 	onCancel,
 }: {
 	isSearching: boolean;
+	searchError: string | null;
+	searchTime: number;
 	onSearch: () => void;
 	onCancel: () => void;
 }) {
@@ -407,7 +376,9 @@ function OnlineOptions({
 					</div>
 					<div className="text-center">
 						<p className="text-sm font-medium text-white">Searching for opponent...</p>
-						<p className="mt-0.5 text-xs text-zinc-500">Matching by ELO rating (1850)</p>
+						<p className="mt-0.5 text-xs text-zinc-500">
+							Waiting for {searchTime}s
+						</p>
 					</div>
 					<button
 						onClick={onCancel}
@@ -417,24 +388,29 @@ function OnlineOptions({
 					</button>
 				</div>
 			) : (
-				<div className="rounded-xl border border-white/5 bg-surface-lighter/50 p-4">
-					<div className="flex items-center gap-3">
-						<div className="flex h-9 w-9 items-center justify-center rounded-lg bg-neon-pink/10">
-							<UsersIcon className="h-5 w-5 text-neon-pink" />
+				<div className="space-y-3">
+					<div className="rounded-xl border border-white/5 bg-surface-lighter/50 p-4">
+						<div className="flex items-center gap-3">
+							<div className="flex h-9 w-9 items-center justify-center rounded-lg bg-neon-pink/10">
+								<UsersIcon className="h-5 w-5 text-neon-pink" />
+							</div>
+							<div className="flex-1">
+								<p className="text-sm font-medium text-zinc-200">
+									Online Matchmaking
+								</p>
+								<p className="text-xs text-zinc-500">Find an opponent by ELO rating</p>
+							</div>
+							<button
+								onClick={onSearch}
+								className="rounded-lg bg-neon-pink/10 px-3 py-1.5 text-sm font-medium text-neon-pink transition-colors hover:bg-neon-pink/20"
+							>
+								Find Match
+							</button>
 						</div>
-						<div className="flex-1">
-							<p className="text-sm font-medium text-zinc-200">
-								<span className="text-emerald-400">247</span> players online
-							</p>
-							<p className="text-xs text-zinc-500">Avg. wait time: ~15s</p>
-						</div>
-						<button
-							onClick={onSearch}
-							className="rounded-lg bg-neon-pink/10 px-3 py-1.5 text-sm font-medium text-neon-pink transition-colors hover:bg-neon-pink/20"
-						>
-							Find Match
-						</button>
 					</div>
+					{searchError && (
+						<p className="text-center text-xs text-red-400">{searchError}</p>
+					)}
 				</div>
 			)}
 		</div>
@@ -469,8 +445,8 @@ function RoomOptions() {
 				<button
 					onClick={() => setRoomTab("create")}
 					className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all ${roomTab === "create"
-							? "bg-amber-500/10 text-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]"
-							: "text-zinc-400 hover:text-white"
+						? "bg-amber-500/10 text-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]"
+						: "text-zinc-400 hover:text-white"
 						}`}
 				>
 					Create Room
@@ -478,8 +454,8 @@ function RoomOptions() {
 				<button
 					onClick={() => setRoomTab("join")}
 					className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all ${roomTab === "join"
-							? "bg-amber-500/10 text-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]"
-							: "text-zinc-400 hover:text-white"
+						? "bg-amber-500/10 text-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]"
+						: "text-zinc-400 hover:text-white"
 						}`}
 				>
 					Join Room
@@ -548,42 +524,6 @@ function RoomOptions() {
 	);
 }
 
-/* ──────────────────────── Tournament Options ──────────────────────── */
-
-function TournamentOptions() {
-	const tournaments = [
-		{ id: 1, name: "Neon Cup", players: "8/8", status: "Starting soon", statusColor: "text-amber-400" },
-		{ id: 2, name: "Weekend Clash", players: "5/16", status: "Open", statusColor: "text-emerald-400" },
-		{ id: 3, name: "Ranked Showdown", players: "12/16", status: "Filling up", statusColor: "text-neon-cyan" },
-	];
-
-	return (
-		<div>
-			<h4 className="mb-3 text-sm font-medium text-zinc-300">Available Tournaments</h4>
-			<div className="space-y-2">
-				{tournaments.map((t) => (
-					<div
-						key={t.id}
-						className="flex items-center gap-3 rounded-xl border border-white/5 bg-surface-lighter/50 px-4 py-3 transition-all hover:border-white/10"
-					>
-						<div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-500/10">
-							<TournamentIcon className="h-5 w-5 text-emerald-400" />
-						</div>
-						<div className="min-w-0 flex-1">
-							<p className="text-sm font-medium text-zinc-200">{t.name}</p>
-							<p className="text-xs text-zinc-500">{t.players} players</p>
-						</div>
-						<span className={`text-xs font-medium ${t.statusColor}`}>{t.status}</span>
-						<button className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20">
-							Join
-						</button>
-					</div>
-				))}
-			</div>
-		</div>
-	);
-}
-
 /* ──────────────────────── Pong Preview ──────────────────────── */
 
 function PongPreview() {
@@ -615,9 +555,100 @@ export default function PlayPage() {
 	const [selectedMode, setSelectedMode] = useState<string>("ai");
 	const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>("medium");
 	const [isSearching, setIsSearching] = useState(false);
+	const [searchError, setSearchError] = useState<string | null>(null);
+	const [searchTime, setSearchTime] = useState(0);
+	const searchTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const isSearchingRef = useRef(false);
 
 	const activeMode = gameModes.find((m) => m.id === selectedMode)!;
 	const c = colorMap[activeMode.color];
+
+	// Listen for MATCH_FOUND events from the notification WebSocket
+	useEffect(() => {
+		function handleMatchFound(e: Event) {
+			const detail = (e as CustomEvent).detail;
+			if (detail?.roomId && isSearchingRef.current) {
+				isSearchingRef.current = false;
+				// Don't call setIsSearching(false) — it causes a re-render that
+				// briefly flashes the non-searching UI before navigation completes.
+				// The component will unmount during navigation and cleanup runs there.
+				if (searchTimerRef.current) {
+					clearInterval(searchTimerRef.current);
+					searchTimerRef.current = null;
+				}
+				router.push(`/dashboard/play/online?roomId=${detail.roomId}`);
+			}
+		}
+		window.addEventListener("matchFound", handleMatchFound);
+		return () => window.removeEventListener("matchFound", handleMatchFound);
+	}, [router]);
+
+	// Cleanup on unmount
+	useEffect(() => {
+		return () => {
+			if (searchTimerRef.current) {
+				clearInterval(searchTimerRef.current);
+			}
+			// Leave queue if still searching when navigating away
+			if (isSearchingRef.current) {
+				leaveMatchmakingQueue().catch(() => { });
+			}
+		};
+	}, []);
+
+	const handleSearchMatch = useCallback(async () => {
+		setSearchError(null);
+		setIsSearching(true);
+		isSearchingRef.current = true;
+		setSearchTime(1);
+
+		// Start timer from 1s
+		searchTimerRef.current = setInterval(() => {
+			setSearchTime((t) => t + 1);
+		}, 1000);
+
+		try {
+			const res = await enterMatchmakingQueue();
+			// Guard: the MATCH_FOUND notification may have already navigated us
+			if (!isSearchingRef.current) return;
+
+			if (res.data.matched && res.data.roomId) {
+				// Immediate match — navigate without updating React state.
+				// Calling setIsSearching(false) would re-render the play page mid-
+				// transition and briefly flash the non-searching UI.
+				isSearchingRef.current = false;
+				if (searchTimerRef.current) {
+					clearInterval(searchTimerRef.current);
+					searchTimerRef.current = null;
+				}
+				router.push(`/dashboard/play/online?roomId=${res.data.roomId}`);
+			}
+			// If not matched, keep searching — MATCH_FOUND event will fire
+		} catch (err: any) {
+			if (!isSearchingRef.current) return;
+			isSearchingRef.current = false;
+			setIsSearching(false);
+			if (searchTimerRef.current) {
+				clearInterval(searchTimerRef.current);
+				searchTimerRef.current = null;
+			}
+			setSearchError(err?.message || "Failed to enter matchmaking queue");
+		}
+	}, [router]);
+
+	const handleCancelSearch = useCallback(async () => {
+		isSearchingRef.current = false;
+		setIsSearching(false);
+		if (searchTimerRef.current) {
+			clearInterval(searchTimerRef.current);
+			searchTimerRef.current = null;
+		}
+		try {
+			await leaveMatchmakingQueue();
+		} catch {
+			// Silently fail — user already left UI-wise
+		}
+	}, []);
 
 	function handleStart() {
 		if (selectedMode === "ai") {
@@ -628,10 +659,6 @@ export default function PlayPage() {
 			router.push("/dashboard/play/local");
 			return;
 		}
-		if (selectedMode === "online") {
-			setIsSearching(true);
-		}
-		// TODO: wire other modes to game engine / API
 	}
 
 	return (
@@ -706,15 +733,16 @@ export default function PlayPage() {
 							{selectedMode === "online" && (
 								<OnlineOptions
 									isSearching={isSearching}
-									onSearch={() => setIsSearching(true)}
-									onCancel={() => setIsSearching(false)}
+									searchError={searchError}
+									searchTime={searchTime}
+									onSearch={handleSearchMatch}
+									onCancel={handleCancelSearch}
 								/>
 							)}
 							{selectedMode === "room" && <RoomOptions />}
-							{selectedMode === "tournament" && <TournamentOptions />}
 
 							{/* Start button */}
-							{selectedMode !== "online" && selectedMode !== "room" && selectedMode !== "tournament" && (
+							{selectedMode !== "online" && selectedMode !== "room" && (
 								<button
 									onClick={handleStart}
 									className={`mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold transition-all ${c.btn}`}
