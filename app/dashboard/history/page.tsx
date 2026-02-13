@@ -136,6 +136,22 @@ interface ResolvedMatch {
 	duration: string;
 	durationSeconds: number;
 	playedAt: string;
+	gameMode: string;
+}
+
+const AI_OPPONENT_IDS = new Set(["ai_easy", "ai_medium", "ai_hard"]);
+
+const AI_MODE_LABELS: Record<string, { label: string; color: string }> = {
+	ai_easy: { label: "Easy", color: "text-emerald-400 bg-emerald-500/10" },
+	ai_medium: { label: "Medium", color: "text-amber-400 bg-amber-500/10" },
+	ai_hard: { label: "Hard", color: "text-red-400 bg-red-500/10" },
+};
+
+function getOpponentDisplayName(opponentId: string, gameMode: string, cachedName?: string): string {
+	if (AI_OPPONENT_IDS.has(opponentId) || gameMode.startsWith("ai_")) {
+		return "AI";
+	}
+	return cachedName || "Unknown";
 }
 
 /* ──────────────────────── Skeleton Loaders ──────────────────────── */
@@ -194,14 +210,14 @@ export default function HistoryPage() {
 
 	const resolveMatches = useCallback(
 		async (rawMatches: ApiMatch[], userId: string): Promise<ResolvedMatch[]> => {
-			// Collect unknown opponent IDs
+			// Collect unknown opponent IDs (skip AI sentinels)
 			const unknownIds = new Set<string>();
 			for (const m of rawMatches) {
 				const opId = m.playerAId === userId ? m.playerBId : m.playerAId;
-				if (!userCache.has(opId)) unknownIds.add(opId);
+				if (!userCache.has(opId) && !AI_OPPONENT_IDS.has(opId)) unknownIds.add(opId);
 			}
 
-			// Batch resolve
+			// Batch resolve real users only
 			await Promise.allSettled(
 				[...unknownIds].map(async (id) => {
 					try {
@@ -218,16 +234,18 @@ export default function HistoryPage() {
 				const opponentId = isPlayerA ? m.playerBId : m.playerAId;
 				const myScore = isPlayerA ? m.scoreA : m.scoreB;
 				const opScore = isPlayerA ? m.scoreB : m.scoreA;
+				const gameMode = m.gameMode || "online";
 
 				let result: "win" | "loss" | "draw";
 				if (m.winnerId === userId) result = "win";
+				else if (m.winnerId === null && gameMode.startsWith("ai_")) result = "loss"; // AI won
 				else if (m.winnerId === null) result = "draw";
 				else result = "loss";
 
 				return {
 					id: m.id,
 					opponentId,
-					opponentName: userCache.get(opponentId) || "Unknown",
+					opponentName: getOpponentDisplayName(opponentId, gameMode, userCache.get(opponentId)),
 					result,
 					myScore,
 					opScore,
@@ -237,6 +255,7 @@ export default function HistoryPage() {
 					duration: formatDuration(m.duration),
 					durationSeconds: m.duration,
 					playedAt: m.playedAt,
+					gameMode,
 				};
 			});
 		},
@@ -424,8 +443,8 @@ export default function HistoryPage() {
 									key={f.value}
 									onClick={() => setFilter(f.value)}
 									className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${filter === f.value
-											? "bg-accent/20 text-accent-light shadow-[0_0_10px_rgba(139,92,246,0.15)]"
-											: "text-zinc-500 hover:text-zinc-300"
+										? "bg-accent/20 text-accent-light shadow-[0_0_10px_rgba(139,92,246,0.15)]"
+										: "text-zinc-500 hover:text-zinc-300"
 										}`}
 								>
 									{f.label}
@@ -480,19 +499,18 @@ export default function HistoryPage() {
 							{filteredMatches.map((match) => {
 								const isWin = match.result === "win";
 								const isDraw = match.result === "draw";
-								return (
-									<Link
-										key={match.id}
-										href={`/dashboard/player/${match.opponentName}`}
-										className="flex items-center gap-4 rounded-xl border border-white/5 bg-surface-lighter/50 px-4 py-3.5 transition-all hover:border-white/10 hover:bg-surface-lighter"
-									>
+								const isAI = match.gameMode.startsWith("ai_");
+								const aiLabel = AI_MODE_LABELS[match.gameMode];
+
+								const rowContent = (
+									<>
 										{/* Result indicator */}
 										<div
 											className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold ${isDraw
-													? "bg-zinc-500/10 text-zinc-400"
-													: isWin
-														? "bg-emerald-500/10 text-emerald-400"
-														: "bg-red-500/10 text-red-400"
+												? "bg-zinc-500/10 text-zinc-400"
+												: isWin
+													? "bg-emerald-500/10 text-emerald-400"
+													: "bg-red-500/10 text-red-400"
 												}`}
 										>
 											{isDraw ? "D" : isWin ? "W" : "L"}
@@ -500,9 +518,16 @@ export default function HistoryPage() {
 
 										{/* Opponent & date (mobile) */}
 										<div className="min-w-0 flex-1">
-											<p className="truncate text-sm font-medium text-white">
-												vs {match.opponentName}
-											</p>
+											<div className="flex items-center gap-2">
+												<p className="truncate text-sm font-medium text-white">
+													vs {match.opponentName}
+												</p>
+												{isAI && aiLabel && (
+													<span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${aiLabel.color}`}>
+														{aiLabel.label}
+													</span>
+												)}
+											</div>
 											<p className="text-xs text-zinc-500 sm:hidden">
 												{match.date}
 											</p>
@@ -512,10 +537,10 @@ export default function HistoryPage() {
 										<div className="text-center">
 											<span
 												className={`text-sm font-semibold ${isDraw
-														? "text-zinc-400"
-														: isWin
-															? "text-emerald-400"
-															: "text-red-400"
+													? "text-zinc-400"
+													: isWin
+														? "text-emerald-400"
+														: "text-red-400"
 													}`}
 											>
 												{match.score}
@@ -531,6 +556,23 @@ export default function HistoryPage() {
 										<span className="hidden w-28 text-right text-xs text-zinc-500 sm:block">
 											{match.date}
 										</span>
+									</>
+								);
+
+								return isAI ? (
+									<div
+										key={match.id}
+										className="flex items-center gap-4 rounded-xl border border-white/5 bg-surface-lighter/50 px-4 py-3.5 transition-all hover:border-white/10 hover:bg-surface-lighter"
+									>
+										{rowContent}
+									</div>
+								) : (
+									<Link
+										key={match.id}
+										href={`/dashboard/player/${match.opponentName}`}
+										className="flex items-center gap-4 rounded-xl border border-white/5 bg-surface-lighter/50 px-4 py-3.5 transition-all hover:border-white/10 hover:bg-surface-lighter"
+									>
+										{rowContent}
 									</Link>
 								);
 							})}
@@ -581,8 +623,8 @@ export default function HistoryPage() {
 													key={item}
 													onClick={() => setPage(item as number)}
 													className={`flex h-8 min-w-[2rem] items-center justify-center rounded-lg text-xs font-medium transition-all ${page === item
-															? "bg-accent/20 text-accent-light shadow-[0_0_10px_rgba(139,92,246,0.15)]"
-															: "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
+														? "bg-accent/20 text-accent-light shadow-[0_0_10px_rgba(139,92,246,0.15)]"
+														: "text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
 														}`}
 												>
 													{item}

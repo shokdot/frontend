@@ -287,12 +287,13 @@ export default function PlayerPage({
 			if (rankRes.status === "fulfilled") setRank(rankRes.value.data);
 
 			if (matchRes.status === "fulfilled") {
-				// Resolve opponent names
+				// Resolve opponent names (skip AI sentinels)
+				const AI_IDS = new Set(["ai_easy", "ai_medium", "ai_hard"]);
 				const rawMatches = matchRes.value.data;
 				const opponentIds = new Set(
-					rawMatches.map((m) =>
-						m.playerAId === playerProfile.userId ? m.playerBId : m.playerAId,
-					),
+					rawMatches
+						.map((m) => m.playerAId === playerProfile.userId ? m.playerBId : m.playerAId)
+						.filter((id) => !AI_IDS.has(id)),
 				);
 				const nameMap: Record<string, string> = {};
 				await Promise.allSettled(
@@ -308,7 +309,14 @@ export default function PlayerPage({
 				setMatches(
 					rawMatches.map((m) => {
 						const oppId = m.playerAId === playerProfile.userId ? m.playerBId : m.playerAId;
-						return { ...m, opponentName: nameMap[oppId] || "Unknown" };
+						const gameMode = m.gameMode || "online";
+						let opponentName: string;
+						if (AI_IDS.has(oppId) || gameMode.startsWith("ai_")) {
+							opponentName = "AI";
+						} else {
+							opponentName = nameMap[oppId] || "Unknown";
+						}
+						return { ...m, opponentName };
 					}),
 				);
 			}
@@ -574,7 +582,8 @@ export default function PlayerPage({
 									const myScore = isPlayerA ? match.scoreA : match.scoreB;
 									const oppScore = isPlayerA ? match.scoreB : match.scoreA;
 									const isWin = match.winnerId === profile.userId;
-									const isDraw = match.winnerId === null;
+									const gameMode = match.gameMode || "online";
+									const isDraw = match.winnerId === null && !gameMode.startsWith("ai_");
 
 									return (
 										<div
@@ -592,9 +601,20 @@ export default function PlayerPage({
 												{isDraw ? "D" : isWin ? "W" : "L"}
 											</div>
 											<div className="min-w-0 flex-1">
-												<p className="truncate text-sm font-medium text-white">
-													vs {match.opponentName}
-												</p>
+												<div className="flex items-center gap-2">
+													<p className="truncate text-sm font-medium text-white">
+														vs {match.opponentName}
+													</p>
+													{(match.gameMode || "").startsWith("ai_") && (
+														<span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${match.gameMode === "ai_easy" ? "text-emerald-400 bg-emerald-500/10"
+																: match.gameMode === "ai_medium" ? "text-amber-400 bg-amber-500/10"
+																	: match.gameMode === "ai_hard" ? "text-red-400 bg-red-500/10"
+																		: ""
+															}`}>
+															{match.gameMode === "ai_easy" ? "Easy" : match.gameMode === "ai_medium" ? "Medium" : "Hard"}
+														</span>
+													)}
+												</div>
 												<p className="text-xs text-zinc-500 sm:hidden">
 													{new Date(match.playedAt).toLocaleDateString()}
 												</p>

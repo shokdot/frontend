@@ -257,6 +257,7 @@ export interface ApiMatch {
 	scoreB: number;
 	winnerId: string | null;
 	duration: number;
+	gameMode: string;
 	playedAt: string;
 }
 
@@ -279,6 +280,26 @@ export function getMatchHistory(
 	return apiFetch<GetMatchHistoryResponse>(
 		`/api/v1/stats/${encodeURIComponent(userId)}/history?page=${page}&limit=${limit}`,
 	);
+}
+
+/* ───────────── AI Match API ───────────── */
+
+interface RecordAIMatchResponse {
+	status: string;
+	message: string;
+	data: ApiMatch;
+}
+
+export function recordAIMatch(data: {
+	scoreA: number;
+	scoreB: number;
+	duration: number;
+	gameMode: "ai_easy" | "ai_medium" | "ai_hard";
+}) {
+	return apiFetch<RecordAIMatchResponse>("/api/v1/stats/ai-match", {
+		method: "POST",
+		body: JSON.stringify(data),
+	});
 }
 
 /* ───────────── Friends API ───────────── */

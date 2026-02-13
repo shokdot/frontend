@@ -83,7 +83,15 @@ interface ResolvedMatch {
 	result: "win" | "loss" | "draw";
 	score: string;
 	date: string;
+	gameMode: string;
 }
+
+const AI_OPPONENT_IDS = new Set(["ai_easy", "ai_medium", "ai_hard"]);
+const AI_MODE_LABELS: Record<string, { label: string; color: string }> = {
+	ai_easy: { label: "Easy", color: "text-emerald-400 bg-emerald-500/10" },
+	ai_medium: { label: "Medium", color: "text-amber-400 bg-amber-500/10" },
+	ai_hard: { label: "Hard", color: "text-red-400 bg-red-500/10" },
+};
 
 /* ──────────────────────── Loading Skeleton ──────────────────────── */
 
@@ -160,12 +168,12 @@ export default function ProfilePage() {
 			if (historyRes.status === "fulfilled") {
 				const rawMatches = historyRes.value.data;
 				const opponentIds = new Set(
-					rawMatches.map((m) =>
-						m.playerAId === profileData.userId ? m.playerBId : m.playerAId,
-					),
+					rawMatches
+						.map((m) => m.playerAId === profileData.userId ? m.playerBId : m.playerAId)
+						.filter((id) => !AI_OPPONENT_IDS.has(id)),
 				);
 
-				// Batch-resolve unique opponent usernames
+				// Batch-resolve unique opponent usernames (skip AI sentinels)
 				const userCache = new Map<string, string>();
 				await Promise.allSettled(
 					[...opponentIds].map(async (id) => {
@@ -183,18 +191,29 @@ export default function ProfilePage() {
 					const opponentId = isPlayerA ? m.playerBId : m.playerAId;
 					const myScore = isPlayerA ? m.scoreA : m.scoreB;
 					const opScore = isPlayerA ? m.scoreB : m.scoreA;
+					const gameMode = m.gameMode || "online";
 
 					let result: "win" | "loss" | "draw";
 					if (m.winnerId === profileData.userId) result = "win";
+					else if (m.winnerId === null && gameMode.startsWith("ai_")) result = "loss";
 					else if (m.winnerId === null) result = "draw";
 					else result = "loss";
 
+					// AI opponent display name
+					let opponentName: string;
+					if (AI_OPPONENT_IDS.has(opponentId) || gameMode.startsWith("ai_")) {
+						opponentName = "AI";
+					} else {
+						opponentName = userCache.get(opponentId) || "Unknown";
+					}
+
 					return {
 						id: m.id,
-						opponentName: userCache.get(opponentId) || "Unknown",
+						opponentName,
 						result,
 						score: `${myScore} - ${opScore}`,
 						date: timeAgo(m.playedAt),
+						gameMode,
 					};
 				});
 
@@ -386,9 +405,16 @@ export default function ProfilePage() {
 
 											{/* Opponent */}
 											<div className="min-w-0 flex-1">
-												<p className="truncate text-sm font-medium text-white">
-													vs {match.opponentName}
-												</p>
+												<div className="flex items-center gap-2">
+													<p className="truncate text-sm font-medium text-white">
+														vs {match.opponentName}
+													</p>
+													{match.gameMode.startsWith("ai_") && AI_MODE_LABELS[match.gameMode] && (
+														<span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${AI_MODE_LABELS[match.gameMode].color}`}>
+															{AI_MODE_LABELS[match.gameMode].label}
+														</span>
+													)}
+												</div>
 												<p className="text-xs text-zinc-500 sm:hidden">{match.date}</p>
 											</div>
 
