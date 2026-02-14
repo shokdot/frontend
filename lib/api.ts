@@ -323,6 +323,43 @@ export function recordAIMatch(data: {
 	});
 }
 
+/* ───────────── Private Room API ───────────── */
+
+export interface ApiRoom {
+	id: string;
+	createdBy: string;
+	status: "waiting" | "playing" | "finished";
+	players: string[];
+	winScore?: number;
+}
+
+interface CreateRoomResponse {
+	status: string;
+	data: ApiRoom;
+	message: string;
+}
+
+export function createRoom(winScore?: number) {
+	return apiFetch<CreateRoomResponse>("/api/v1/rooms", {
+		method: "POST",
+		body: JSON.stringify(winScore ? { winScore } : {}),
+	});
+}
+
+export function joinRoom(roomId: string) {
+	return apiFetch<{ status: string; message: string }>(
+		`/api/v1/rooms/${encodeURIComponent(roomId)}/join`,
+		{ method: "POST" },
+	);
+}
+
+export function leaveRoom(roomId: string) {
+	return apiFetch<{ status: string; message: string }>(
+		`/api/v1/rooms/${encodeURIComponent(roomId)}/leave`,
+		{ method: "POST" },
+	);
+}
+
 /* ───────────── Friends API ───────────── */
 
 export interface ApiFriend {

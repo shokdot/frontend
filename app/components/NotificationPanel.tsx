@@ -352,6 +352,19 @@ export default function NotificationPanel() {
 				return;
 			}
 
+			// ROOM_UPDATED: dispatch navigation event (same pattern as MATCH_FOUND).
+			if (incoming.type === "ROOM_UPDATED") {
+				try {
+					const payload = typeof incoming.message === "string"
+						? JSON.parse(incoming.message)
+						: incoming.message;
+					window.dispatchEvent(
+						new CustomEvent("roomReady", { detail: payload })
+					);
+				} catch { /* ignore parse errors */ }
+				return;
+			}
+
 			// All other internal / transient types — silently ignore.
 			if (SILENT_TYPES.has(incoming.type)) {
 				return;

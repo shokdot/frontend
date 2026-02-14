@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { enterMatchmakingQueue, leaveMatchmakingQueue } from "@/lib/api";
+import { enterMatchmakingQueue, leaveMatchmakingQueue, createRoom, joinRoom, leaveRoom } from "@/lib/api";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -419,21 +419,86 @@ function OnlineOptions({
 
 /* ──────────────────────── Room Options ──────────────────────── */
 
-function RoomOptions() {
+function RoomOptions({
+	router,
+}: {
+	router: ReturnType<typeof useRouter>;
+}) {
 	const [roomTab, setRoomTab] = useState<"create" | "join">("create");
 	const [roomCode, setRoomCode] = useState("");
-	const [generatedCode, setGeneratedCode] = useState("");
+	const [createdRoomId, setCreatedRoomId] = useState("");
 	const [copied, setCopied] = useState(false);
+	const [isCreating, setIsCreating] = useState(false);
+	const [isJoining, setIsJoining] = useState(false);
+	const [roomError, setRoomError] = useState<string | null>(null);
+	const [winScore, setWinScore] = useState(5);
+	const createdRoomIdRef = useRef("");
 
-	function handleCreate() {
-		const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-		setGeneratedCode(code);
+	const scoreLimits = [3, 5, 7, 10];
+
+	// Listen for roomReady event (dispatched when ROOM_UPDATED arrives with status playing)
+	useEffect(() => {
+		function handleRoomReady(e: Event) {
+			const detail = (e as CustomEvent).detail;
+			if (detail?.roomId && createdRoomIdRef.current && detail.roomId === createdRoomIdRef.current) {
+				// Prevent cleanup from leaving the room by clearing the ref
+				createdRoomIdRef.current = "";
+				router.push(`/dashboard/play/room?roomId=${detail.roomId}`);
+			}
+		}
+		window.addEventListener("roomReady", handleRoomReady);
+		return () => window.removeEventListener("roomReady", handleRoomReady);
+	}, [router]);
+
+	// Cleanup: leave the room if creator navigates away before opponent joins
+	useEffect(() => {
+		return () => {
+			if (createdRoomIdRef.current) {
+				leaveRoom(createdRoomIdRef.current).catch(() => { });
+			}
+		};
+	}, []);
+
+	async function handleCreate() {
+		setRoomError(null);
+		setIsCreating(true);
+		try {
+			const res = await createRoom(winScore);
+			const roomId = res.data.id;
+			setCreatedRoomId(roomId);
+			createdRoomIdRef.current = roomId;
+		} catch (err: any) {
+			setRoomError(err?.message || "Failed to create room");
+		} finally {
+			setIsCreating(false);
+		}
+	}
+
+	function handleCancelRoom() {
+		if (createdRoomIdRef.current) {
+			leaveRoom(createdRoomIdRef.current).catch(() => { });
+		}
+		setCreatedRoomId("");
+		createdRoomIdRef.current = "";
 	}
 
 	function handleCopy() {
-		navigator.clipboard.writeText(generatedCode);
+		navigator.clipboard.writeText(createdRoomId);
 		setCopied(true);
 		setTimeout(() => setCopied(false), 2000);
+	}
+
+	async function handleJoin() {
+		if (!roomCode.trim()) return;
+		setRoomError(null);
+		setIsJoining(true);
+		try {
+			await joinRoom(roomCode.trim());
+			router.push(`/dashboard/play/room?roomId=${roomCode.trim()}`);
+		} catch (err: any) {
+			setRoomError(err?.message || "Failed to join room");
+			setIsJoining(false);
+		}
 	}
 
 	return (
@@ -443,7 +508,7 @@ function RoomOptions() {
 			{/* Tabs */}
 			<div className="mb-4 flex gap-1 rounded-xl border border-white/5 bg-surface-lighter/50 p-1">
 				<button
-					onClick={() => setRoomTab("create")}
+					onClick={() => { setRoomTab("create"); setRoomError(null); }}
 					className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all ${roomTab === "create"
 						? "bg-amber-500/10 text-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]"
 						: "text-zinc-400 hover:text-white"
@@ -452,7 +517,7 @@ function RoomOptions() {
 					Create Room
 				</button>
 				<button
-					onClick={() => setRoomTab("join")}
+					onClick={() => { setRoomTab("join"); setRoomError(null); }}
 					className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all ${roomTab === "join"
 						? "bg-amber-500/10 text-amber-400 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]"
 						: "text-zinc-400 hover:text-white"
@@ -464,12 +529,12 @@ function RoomOptions() {
 
 			{roomTab === "create" ? (
 				<div className="space-y-3">
-					{generatedCode ? (
+					{createdRoomId ? (
 						<div className="rounded-xl border border-amber-500/15 bg-amber-500/5 p-4">
 							<p className="mb-2 text-xs text-zinc-500">Share this code with your friend</p>
 							<div className="flex items-center gap-2">
-								<div className="flex-1 rounded-lg border border-white/10 bg-surface px-4 py-2.5 text-center font-mono text-lg font-bold tracking-[0.3em] text-amber-400">
-									{generatedCode}
+								<div className="flex-1 rounded-lg border border-white/10 bg-surface px-4 py-3 text-center font-mono text-2xl font-bold tracking-[0.3em] text-amber-400 select-all">
+									{createdRoomId}
 								</div>
 								<button
 									onClick={handleCopy}
@@ -486,14 +551,49 @@ function RoomOptions() {
 							<div className="mt-2 flex justify-center">
 								<SpinnerIcon className="h-4 w-4 text-amber-400" />
 							</div>
+							<button
+								onClick={handleCancelRoom}
+								className="mt-3 w-full rounded-lg border border-red-500/20 bg-red-500/10 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20"
+							>
+								Cancel Room
+							</button>
 						</div>
 					) : (
-						<button
-							onClick={handleCreate}
-							className="w-full rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-4 text-sm font-medium text-amber-400 transition-all hover:border-amber-500/30 hover:bg-amber-500/10"
-						>
-							Generate Room Code
-						</button>
+						<div className="space-y-4">
+							{/* Score limit selector */}
+							<div>
+								<p className="mb-2 text-xs text-zinc-500">Score limit</p>
+								<div className="grid grid-cols-4 gap-2">
+									{scoreLimits.map((n) => (
+										<button
+											key={n}
+											onClick={() => setWinScore(n)}
+											className={`rounded-xl border py-2.5 text-center text-sm font-semibold transition-all ${winScore === n
+												? "border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.08)]"
+												: "border-white/5 bg-surface-lighter/50 text-zinc-400 hover:border-white/10 hover:text-white"
+												}`}
+										>
+											{n}
+										</button>
+									))}
+								</div>
+								<p className="mt-1.5 text-center text-[11px] text-zinc-600">First to {winScore} wins</p>
+							</div>
+							<button
+								onClick={handleCreate}
+								disabled={isCreating}
+								className="w-full rounded-xl border border-amber-500/15 bg-amber-500/5 px-4 py-4 text-sm font-medium text-amber-400 transition-all hover:border-amber-500/30 hover:bg-amber-500/10 disabled:cursor-not-allowed disabled:opacity-40"
+							>
+								{isCreating ? (
+									<span className="flex items-center justify-center gap-2">
+										<SpinnerIcon className="h-4 w-4" />
+										Creating...
+									</span>
+								) : (
+									"Create Room"
+								)}
+							</button>
+						</div>
 					)}
 				</div>
 			) : (
@@ -506,19 +606,31 @@ function RoomOptions() {
 							id="room-code"
 							type="text"
 							value={roomCode}
-							onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-							placeholder="e.g. A1B2C3"
+							onChange={(e) => setRoomCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+							placeholder="e.g. A3X7K2"
 							maxLength={6}
-							className="w-full rounded-xl border border-white/5 bg-surface-lighter py-2.5 px-4 text-center font-mono text-lg tracking-[0.3em] text-white placeholder-zinc-600 outline-none transition-colors focus:border-amber-500/30 focus:ring-1 focus:ring-amber-500/20"
+							className="w-full rounded-xl border border-white/5 bg-surface-lighter py-3 px-4 text-center font-mono text-xl tracking-[0.3em] text-white placeholder-zinc-600 outline-none transition-colors focus:border-amber-500/30 focus:ring-1 focus:ring-amber-500/20 uppercase"
 						/>
 					</div>
 					<button
-						disabled={roomCode.length < 4}
+						onClick={handleJoin}
+						disabled={roomCode.trim().length < 6 || isJoining}
 						className="w-full rounded-xl bg-amber-500/10 py-2.5 text-sm font-medium text-amber-400 transition-all hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40"
 					>
-						Join Room
+						{isJoining ? (
+							<span className="flex items-center justify-center gap-2">
+								<SpinnerIcon className="h-4 w-4" />
+								Joining...
+							</span>
+						) : (
+							"Join Room"
+						)}
 					</button>
 				</div>
+			)}
+
+			{roomError && (
+				<p className="mt-3 text-center text-xs text-red-400">{roomError}</p>
 			)}
 		</div>
 	);
@@ -739,7 +851,7 @@ export default function PlayPage() {
 									onCancel={handleCancelSearch}
 								/>
 							)}
-							{selectedMode === "room" && <RoomOptions />}
+							{selectedMode === "room" && <RoomOptions router={router} />}
 
 							{/* Start button */}
 							{selectedMode !== "online" && selectedMode !== "room" && (
