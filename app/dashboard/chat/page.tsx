@@ -585,6 +585,8 @@ function NewMessageModal({
 				avatarUrl: user.avatarUrl,
 				createdAt: "",
 				updatedAt: "",
+				theme: "dark",
+				paddleColor: "#ffffff",
 			});
 		}
 	}

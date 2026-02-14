@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { setAccessToken } from "@/lib/auth";
@@ -10,7 +10,7 @@ interface FieldErrors {
 	password?: string;
 }
 
-export default function LoginPage() {
+function LoginContent() {
 	const searchParams = useSearchParams();
 	const redirectTo = searchParams.get("redirect") || "/dashboard";
 
@@ -434,5 +434,13 @@ export default function LoginPage() {
 				</div>
 			</div>
 		</div>
+	);
+}
+
+export default function LoginPage() {
+	return (
+		<Suspense fallback={<div className="flex min-h-screen items-center justify-center text-zinc-500">Loading...</div>}>
+			<LoginContent />
+		</Suspense>
 	);
 }
