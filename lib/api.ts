@@ -626,6 +626,12 @@ export function disconnectGithub() {
 	);
 }
 
+export function deleteAccount() {
+	return apiFetch<{ status: string; message: string }>("/api/v1/auth/me", {
+		method: "DELETE",
+	});
+}
+
 /* ───────────── 2FA API ───────────── */
 
 interface Setup2FAResponse {

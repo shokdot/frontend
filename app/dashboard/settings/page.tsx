@@ -17,6 +17,7 @@ import {
 	setup2FA as apiSetup2FA,
 	confirm2FA as apiConfirm2FA,
 	disable2FA as apiDisable2FA,
+	deleteAccount as apiDeleteAccount,
 	AuthMeData,
 	ApiError,
 } from "@/lib/api";
@@ -395,6 +396,11 @@ export default function SettingsPage() {
 	const [setPwLoading, setSetPwLoading] = useState(false);
 	const [setPwSuccess, setSetPwSuccess] = useState(false);
 
+	/* Delete Account */
+	const [showDeleteModal, setShowDeleteModal] = useState(false);
+	const [deleteLoading, setDeleteLoading] = useState(false);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
+
 	const loadAuthMe = useCallback(async () => {
 		try {
 			const res = await getAuthMe();
@@ -593,6 +599,22 @@ export default function SettingsPage() {
 			setSetPwError(message);
 		} finally {
 			setSetPwLoading(false);
+		}
+	}
+
+	async function handleDeleteAccount() {
+		setDeleteError(null);
+		setDeleteLoading(true);
+		try {
+			await apiDeleteAccount();
+			// Log out and redirect
+			clearAuth();
+			window.location.href = "/";
+		} catch (err: unknown) {
+			const message = err instanceof ApiError ? err.message : "Failed to delete account";
+			setDeleteError(message);
+		} finally {
+			setDeleteLoading(false);
 		}
 	}
 
@@ -1188,12 +1210,51 @@ export default function SettingsPage() {
 													</p>
 												</div>
 											</div>
-											<button className="flex-shrink-0 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20">
+											<button
+												onClick={() => setShowDeleteModal(true)}
+												className="flex-shrink-0 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20"
+											>
 												Delete Account
 											</button>
 										</div>
 									</div>
 								</SettingsSection>
+
+								{/* Delete Account Modal */}
+								{showDeleteModal && (
+									<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+										<div className="mx-4 w-full max-w-md rounded-2xl border border-white/10 bg-surface-light p-6 shadow-2xl">
+											<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500/10 text-red-400 mb-4">
+												<TrashIcon className="h-6 w-6" />
+											</div>
+											<h3 className="text-xl font-bold text-white">Delete Account?</h3>
+											<p className="mt-2 text-sm text-zinc-400 leading-relaxed">
+												Are you absolutely sure? This action is <span className="text-red-400 font-semibold underline">permanent</span> and will erase all your profile data, match history, friends, and notifications.
+											</p>
+											{deleteError && (
+												<p className="mt-4 text-sm font-medium text-red-400 bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+													{deleteError}
+												</p>
+											)}
+											<div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+												<button
+													onClick={() => setShowDeleteModal(false)}
+													disabled={deleteLoading}
+													className="rounded-xl px-4 py-2.5 text-sm font-semibold text-zinc-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50"
+												>
+													Cancel, keep account
+												</button>
+												<button
+													onClick={handleDeleteAccount}
+													disabled={deleteLoading}
+													className="rounded-xl bg-red-600 px-6 py-2.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all hover:bg-red-500 hover:shadow-[0_0_30px_rgba(220,38,38,0.5)] disabled:opacity-50"
+												>
+													{deleteLoading ? "Deleting..." : "Yes, delete everything"}
+												</button>
+											</div>
+										</div>
+									</div>
+								)}
 							</>
 						)}
 
