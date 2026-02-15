@@ -1,6 +1,8 @@
 import Navbar from "./components/Navbar";
+import Logo from "./components/Logo";
 
 /* ──────────────────────── SVG Icons ──────────────────────── */
+
 
 function GamepadIcon({ className }: { className?: string }) {
 	return (
@@ -419,13 +421,12 @@ export default function Home() {
 						{/* Brand */}
 						<div className="sm:col-span-2 lg:col-span-1">
 							<div className="flex items-center gap-2">
-								<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent shadow-[0_0_12px_rgba(139,92,246,0.3)]">
-									<svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="currentColor">
-										<path d="M8 5v14l11-7z" />
-									</svg>
+								<div className="flex h-8 w-8 items-center justify-center transition-shadow shadow-[0_0_12px_rgba(139,92,246,0.3)] overflow-hidden rounded-lg">
+									<Logo className="h-full w-full" />
 								</div>
 								<span className="text-base font-bold text-white">iPong</span>
 							</div>
+
 							<p className="mt-3 max-w-xs text-sm text-zinc-500">
 								A 42 project — real-time multiplayer game platform built with
 								modern web technologies.

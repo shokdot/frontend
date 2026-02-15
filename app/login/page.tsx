@@ -4,6 +4,8 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { setAccessToken } from "@/lib/auth";
+import Logo from "../components/Logo";
+
 
 interface FieldErrors {
 	email?: string;
@@ -175,13 +177,12 @@ function LoginContent() {
 				<div className="relative z-10 w-full max-w-md">
 					<div className="mb-8 text-center">
 						<Link href="/" className="inline-flex items-center gap-2.5">
-							<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent shadow-[0_0_20px_rgba(139,92,246,0.4)]">
-								<svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-									<path d="M8 5v14l11-7z" />
-								</svg>
+							<div className="flex h-10 w-10 items-center justify-center rounded-lg shadow-[0_0_20px_rgba(139,92,246,0.4)] overflow-hidden">
+								<Logo className="h-full w-full" />
 							</div>
-							<span className="text-xl font-bold text-white">transcendence</span>
+							<span className="text-xl font-bold text-white">iPong</span>
 						</Link>
+
 					</div>
 
 					<div className="rounded-2xl border border-white/5 bg-surface-light p-8 shadow-[0_0_30px_rgba(139,92,246,0.06)] sm:p-10">
@@ -274,13 +275,12 @@ function LoginContent() {
 				{/* Logo */}
 				<div className="mb-8 text-center">
 					<Link href="/" className="inline-flex items-center gap-2.5">
-						<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent shadow-[0_0_20px_rgba(139,92,246,0.4)]">
-							<svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-								<path d="M8 5v14l11-7z" />
-							</svg>
+						<div className="flex h-10 w-10 items-center justify-center rounded-lg shadow-[0_0_20px_rgba(139,92,246,0.4)] overflow-hidden">
+							<Logo className="h-full w-full" />
 						</div>
-						<span className="text-xl font-bold text-white">transcendence</span>
+						<span className="text-xl font-bold text-white">iPong</span>
 					</Link>
+
 				</div>
 
 				{/* Card */}

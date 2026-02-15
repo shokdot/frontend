@@ -7,20 +7,21 @@ import NotificationPanel from "../components/NotificationPanel";
 import StatusProvider, { mapBackendStatus } from "../components/StatusProvider";
 import ChatProvider, { useChat } from "../components/ChatProvider";
 import { useTheme } from "../components/ThemeProvider";
+import Logo from "../components/Logo";
 import { clearAuth, getAccessToken } from "@/lib/auth";
+
 import { getMyProfile, ApiUserProfile, searchUsers, ApiSearchResult } from "@/lib/api";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
 function LogoIcon() {
 	return (
-		<div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent shadow-[0_0_15px_rgba(139,92,246,0.4)]">
-			<svg className="h-5 w-5 text-[#fff]" viewBox="0 0 24 24" fill="currentColor">
-				<path d="M8 5v14l11-7z" />
-			</svg>
+		<div className="flex h-9 w-9 items-center justify-center transition-shadow shadow-[0_0_15px_rgba(139,92,246,0.4)] overflow-hidden rounded-lg">
+			<Logo className="h-full w-full" />
 		</div>
 	);
 }
+
 
 function DashboardIcon({ className }: { className?: string }) {
 	return (
@@ -299,13 +300,12 @@ export default function DashboardLayout({
 		return (
 			<div className="flex min-h-screen items-center justify-center bg-surface">
 				<div className="flex flex-col items-center gap-4">
-					<div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent shadow-[0_0_20px_rgba(139,92,246,0.4)]">
-						<svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-							<path d="M8 5v14l11-7z" />
-						</svg>
+					<div className="flex h-12 w-12 items-center justify-center transition-shadow shadow-[0_0_20px_rgba(139,92,246,0.4)] overflow-hidden rounded-xl">
+						<Logo className="h-full w-full" />
 					</div>
 					<div className="h-5 w-5 animate-spin rounded-full border-2 border-zinc-700 border-t-accent" />
 				</div>
+
 			</div>
 		);
 	}

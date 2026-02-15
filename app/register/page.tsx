@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Logo from "../components/Logo";
+
 
 interface FieldErrors {
 	username?: string;
@@ -115,13 +117,12 @@ export default function RegisterPage() {
 				{/* Logo */}
 				<div className="mb-8 text-center">
 					<Link href="/" className="inline-flex items-center gap-2.5">
-						<div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent shadow-[0_0_20px_rgba(139,92,246,0.4)]">
-							<svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-								<path d="M8 5v14l11-7z" />
-							</svg>
+						<div className="flex h-10 w-10 items-center justify-center rounded-lg shadow-[0_0_20px_rgba(139,92,246,0.4)] overflow-hidden">
+							<Logo className="h-full w-full" />
 						</div>
-						<span className="text-xl font-bold text-white">transcendence</span>
+						<span className="text-xl font-bold text-white">iPong</span>
 					</Link>
+
 				</div>
 
 				{/* Card */}

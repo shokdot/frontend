@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Logo from "./Logo";
 
 const navLinks = [
 	{ label: "Features", href: "#features" },
@@ -28,19 +29,14 @@ export default function Navbar() {
 			<div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
 				{/* Logo */}
 				<a href="#" className="group flex items-center gap-2.5">
-					<div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent shadow-[0_0_15px_rgba(139,92,246,0.4)] transition-shadow group-hover:shadow-[0_0_25px_rgba(139,92,246,0.6)]">
-						<svg
-							className="h-5 w-5 text-white"
-							viewBox="0 0 24 24"
-							fill="currentColor"
-						>
-							<path d="M8 5v14l11-7z" />
-						</svg>
+					<div className="flex h-9 w-9 items-center justify-center transition-shadow shadow-[0_0_15px_rgba(139,92,246,0.4)] group-hover:shadow-[0_0_25px_rgba(139,92,246,0.6)] overflow-hidden rounded-lg">
+						<Logo className="h-full w-full" />
 					</div>
 					<span className="text-lg font-bold text-white transition-all group-hover:neon-text-purple">
 						iPong
 					</span>
 				</a>
+
 
 				{/* Desktop nav */}
 				<div className="hidden items-center gap-8 md:flex">

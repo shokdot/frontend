@@ -13,7 +13,11 @@ export const metadata: Metadata = {
 	title: "ft_transcendence | Multiplayer Game Platform",
 	description:
 		"A real-time multiplayer game platform with chat, tournaments, leaderboards, and more.",
+	icons: {
+		icon: "/icon.svg",
+	},
 };
+
 
 export default function RootLayout({
 	children,
