@@ -8,11 +8,15 @@ import {
 	markAllNotificationsRead,
 	deleteNotification,
 	getUserById,
+	getMyProfile,
+	acceptGameInvitation,
+	declineGameInvitation,
 } from "@/lib/api";
+import { useRouter } from "next/navigation";
 import { getAccessToken } from "@/lib/auth";
 import { playNotificationSound } from "@/lib/notificationSound";
 import { useNotificationSoundPref } from "@/lib/useNotificationSoundPref";
-import { useNotifications } from "./NotificationProvider";
+import { useNotifications, Toast } from "./NotificationProvider";
 
 /* ──────────────────────── Types ──────────────────────── */
 
@@ -147,7 +151,15 @@ function formatNotifTitle(type: string): string {
 
 /** Safely convert a notification message to a renderable string. */
 function safeMessage(msg: unknown): string {
-	if (typeof msg === "string") return msg;
+	if (typeof msg === "string") {
+		try {
+			const parsed = JSON.parse(msg);
+			if (parsed.invitationId) return "You received a game invitation";
+			return msg;
+		} catch {
+			return msg;
+		}
+	}
 	if (msg == null) return "";
 	try {
 		return JSON.stringify(msg);
@@ -287,6 +299,11 @@ function toastThrottleKey(notif: ApiNotification): string {
 			const payload = JSON.parse(notif.message);
 			if (payload?.from) return `NEW_MESSAGE:${payload.from}`;
 		} catch { /* fall through */ }
+	} else if (notif.type === "GAME_INVITE") {
+		try {
+			const payload = JSON.parse(notif.message);
+			if (payload?.from) return `GAME_INVITE:${payload.from}`;
+		} catch { /* fall through */ }
 	}
 	return notif.type;
 }
@@ -298,7 +315,8 @@ export default function NotificationPanel() {
 	const [notifications, setNotifications] = useState<ApiNotification[]>([]);
 	const [loading, setLoading] = useState(true);
 	const panelRef = useRef<HTMLDivElement>(null);
-	const { addToast } = useNotifications();
+	const router = useRouter();
+	const { addToast, removeToast } = useNotifications();
 	/** Tracks the last toast timestamp per throttle key. */
 	const toastThrottleMap = useRef<Map<string, number>>(new Map());
 
@@ -404,6 +422,62 @@ export default function NotificationPanel() {
 				return;
 			}
 
+			if (incoming.type === "GAME_INVITE") {
+				let senderName = "Someone";
+				let invitationId = "";
+				try {
+					const payload = JSON.parse(incoming.message);
+					if (payload.from) senderName = await resolveUsername(payload.from);
+					if (payload.invitationId) invitationId = payload.invitationId;
+				} catch { /* ignore parse errors */ }
+
+				const toastId = crypto.randomUUID();
+
+				const action = invitationId ? (
+					<div className="flex items-center gap-2">
+						<button
+							onClick={async () => {
+								removeToast(toastId);
+								try {
+									const res = await acceptGameInvitation(invitationId);
+									if (res.data?.roomId) {
+										window.location.href = `/dashboard/play/room?roomId=${res.data.roomId}`;
+									}
+								} catch (err) {
+									addToast({ type: "error", title: "Failed to accept invite" });
+								}
+							}}
+							className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-400 transition-colors hover:bg-emerald-500/30"
+						>
+							Accept
+						</button>
+						<button
+							onClick={async () => {
+								removeToast(toastId);
+								try {
+									await declineGameInvitation(invitationId);
+								} catch (err) {
+									// ignore
+								}
+							}}
+							className="rounded-lg bg-white/5 px-3 py-1.5 text-xs font-semibold text-zinc-300 transition-colors hover:bg-white/10"
+						>
+							Decline
+						</button>
+					</div>
+				) : undefined;
+
+				addToast({
+					id: toastId,
+					type: "info",
+					title: "Game Invite",
+					message: `${senderName} invited you to play a match!`,
+					action,
+					duration: 10000,
+				} as Toast);
+				return;
+			}
+
 			addToast({
 				type: toastTypeMap[incoming.type] ?? "info",
 				title: formatNotifTitle(incoming.type),
@@ -414,6 +488,28 @@ export default function NotificationPanel() {
 	);
 
 	useNotificationWebSocket(handleIncomingNotification);
+
+	/* ── Auto-navigate sender on invite accept ── */
+	useEffect(() => {
+		async function handleRoomReady(e: Event) {
+			const detail = (e as CustomEvent).detail;
+			if (!detail?.roomId || !detail?.players) return;
+
+			try {
+				const res = await getMyProfile();
+				const myUserId = res.data.userId;
+				// If the current user is in the match, redirect them to the room
+				if (detail.players.includes(myUserId)) {
+					router.push(`/dashboard/play/room?roomId=${detail.roomId}`);
+				}
+			} catch (err) {
+				// Silently fail if we can't get profile
+			}
+		}
+
+		window.addEventListener("roomReady", handleRoomReady);
+		return () => window.removeEventListener("roomReady", handleRoomReady);
+	}, [router]);
 
 	/* ── Close on outside click ── */
 	useEffect(() => {

@@ -14,8 +14,10 @@ import {
 	type ApiFriend,
 	type ApiBlockedUser,
 	ApiError,
+	createGameInvitation,
 } from "@/lib/api";
 import { useStatusMap, mapBackendStatus } from "../../components/StatusProvider";
+import { useNotifications } from "../../components/NotificationProvider";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -229,11 +231,13 @@ function FriendCard({
 	friend,
 	onRemove,
 	onMessage,
+	onInvite,
 	removing,
 }: {
 	friend: Friend;
 	onRemove: (username: string) => void;
 	onMessage: (userId: string) => void;
+	onInvite: (userId: string) => void;
 	removing: boolean;
 }) {
 	return (
@@ -259,7 +263,7 @@ function FriendCard({
 			{/* Actions */}
 			<div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
 				{friend.status === "online" && (
-					<button className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-neon-cyan/10 hover:text-neon-cyan" title="Invite to game">
+					<button onClick={() => onInvite(friend.userId)} className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-neon-cyan/10 hover:text-neon-cyan" title="Invite to game">
 						<GamepadIcon className="h-4 w-4" />
 					</button>
 				)}
@@ -486,6 +490,7 @@ export default function FriendsPage() {
 	const [search, setSearch] = useState("");
 	const [showAddModal, setShowAddModal] = useState(false);
 	const liveStatuses = useStatusMap();
+	const { addToast } = useNotifications();
 
 	// Data state
 	const [friendsList, setFriendsList] = useState<Friend[]>([]);
@@ -587,6 +592,19 @@ export default function FriendsPage() {
 	/* ── Action handlers ── */
 	function handleMessage(userId: string) {
 		router.push(`/dashboard/chat?userId=${userId}`);
+	}
+
+	async function handleInviteToGame(userId: string) {
+		try {
+			await createGameInvitation(userId);
+			addToast({ type: "success", title: "Game invite sent!" });
+		} catch (err: any) {
+			let title = "Failed to send game invite";
+			const msg = err?.message;
+			if (msg === "INVITER_ALREADY_IN_ROOM") title = "You are already in a game/room";
+			else if (msg === "INVITEE_ALREADY_IN_ROOM") title = "Player is already in a game/room";
+			addToast({ type: "error", title });
+		}
 	}
 
 	async function handleRemoveFriend(username: string) {
@@ -754,6 +772,7 @@ export default function FriendsPage() {
 										friend={friend}
 										onRemove={handleRemoveFriend}
 										onMessage={handleMessage}
+										onInvite={handleInviteToGame}
 										removing={busyUser === friend.username}
 									/>
 								))

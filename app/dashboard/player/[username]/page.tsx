@@ -21,8 +21,10 @@ import {
 	ApiPlayerStats,
 	ApiPlayerRank,
 	ApiMatch,
+	createGameInvitation,
 } from "@/lib/api";
 import { useLiveStatus } from "../../../components/StatusProvider";
+import { useNotifications } from "../../../components/NotificationProvider";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -134,6 +136,7 @@ export default function PlayerPage({
 	const [matches, setMatches] = useState<(ApiMatch & { opponentName?: string })[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const { addToast } = useNotifications();
 
 	// Live status from WebSocket (called unconditionally per hook rules)
 	const playerStatus = useLiveStatus(profile?.userId, (profile as any)?.status ?? "offline");
@@ -254,6 +257,20 @@ export default function PlayerPage({
 			// Silently fail
 		} finally {
 			setBlockLoading(false);
+		}
+	}
+
+	async function handleInviteToGame() {
+		if (!profile) return;
+		try {
+			await createGameInvitation(profile.userId);
+			addToast({ type: "success", title: "Game invite sent!" });
+		} catch (err: any) {
+			let title = "Failed to send game invite";
+			const msg = err?.message;
+			if (msg === "INVITER_ALREADY_IN_ROOM") title = "You are already in a game/room";
+			else if (msg === "INVITEE_ALREADY_IN_ROOM") title = "Player is already in a game/room";
+			addToast({ type: "error", title });
 		}
 	}
 
@@ -511,7 +528,7 @@ export default function PlayerPage({
 												{friendLoading ? "..." : "Add Friend"}
 											</button>
 										)}
-										<button className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-surface-lighter px-4 py-2 text-sm font-medium text-zinc-300 transition-all hover:border-neon-cyan/30 hover:text-neon-cyan">
+										<button onClick={handleInviteToGame} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-surface-lighter px-4 py-2 text-sm font-medium text-zinc-300 transition-all hover:border-neon-cyan/30 hover:text-neon-cyan">
 											<GamepadIcon className="h-4 w-4" />
 											Invite
 										</button>
@@ -607,9 +624,9 @@ export default function PlayerPage({
 													</p>
 													{(match.gameMode || "").startsWith("ai_") && (
 														<span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${match.gameMode === "ai_easy" ? "text-emerald-400 bg-emerald-500/10"
-																: match.gameMode === "ai_medium" ? "text-amber-400 bg-amber-500/10"
-																	: match.gameMode === "ai_hard" ? "text-red-400 bg-red-500/10"
-																		: ""
+															: match.gameMode === "ai_medium" ? "text-amber-400 bg-amber-500/10"
+																: match.gameMode === "ai_hard" ? "text-red-400 bg-red-500/10"
+																	: ""
 															}`}>
 															{match.gameMode === "ai_easy" ? "Easy" : match.gameMode === "ai_medium" ? "Medium" : "Hard"}
 														</span>

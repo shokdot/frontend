@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getMyProfile, getUserById } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
@@ -322,6 +322,39 @@ function RoomGameOverScreen({
     );
 }
 
+/* ──────────────────────── Game Left Screen ──────────────────────── */
+
+function GameLeftScreen({ opponentName }: { opponentName: string }) {
+    return (
+        <div className="flex min-h-[calc(100vh-80px)] items-center justify-center p-4">
+            <div className="w-full max-w-md text-center">
+                <div
+                    className="rounded-2xl border bg-surface-light p-8"
+                    style={{ borderColor: "rgba(161,161,170,0.2)" }}
+                >
+                    <div className="mb-4 flex justify-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-500/10">
+                            <WifiOffIcon className="h-8 w-8 text-zinc-400" />
+                        </div>
+                    </div>
+                    <h1 className="text-2xl font-bold text-zinc-200">Game Ended</h1>
+                    <p className="mt-2 text-sm text-zinc-400">
+                        {opponentName} left the game.
+                    </p>
+                    <div className="mt-8">
+                        <Link
+                            href="/dashboard/play"
+                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-8 py-3 text-sm font-semibold text-surface shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all hover:shadow-[0_0_35px_rgba(245,158,11,0.6)]"
+                        >
+                            Go to Play
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /* ──────────────────────── Main Room Game Screen ──────────────────────── */
 
 function RoomGameScreen({
@@ -338,6 +371,7 @@ function RoomGameScreen({
     const keysRef = useRef<Set<string>>(new Set());
     const lastDirRef = useRef<number>(0);
     const playerNumberRef = useRef<1 | 2>(1);
+    const router = useRouter();
 
     const [phase, setPhase] = useState<ConnectionPhase>("connecting");
     const phaseRef = useRef<ConnectionPhase>("connecting");
@@ -350,6 +384,7 @@ function RoomGameScreen({
         opScore: number;
         duration: number;
     } | null>(null);
+    const [leftByOpponent, setLeftByOpponent] = useState(false);
     const [countdownValue, setCountdownValue] = useState(3);
     const [opponentDisconnectTimer, setOpponentDisconnectTimer] = useState(30);
     const disconnectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -557,18 +592,8 @@ function RoomGameScreen({
                         }, 1000);
                         break;
 
-                    case "opponent_left_permanently":
-                        if (stateRef.current) {
-                            const pn = playerNumberRef.current;
-                            setGameResult({
-                                won: true,
-                                myScore: pn === 1 ? stateRef.current.score.player1 : stateRef.current.score.player2,
-                                opScore: pn === 1 ? stateRef.current.score.player2 : stateRef.current.score.player1,
-                                duration: 0,
-                            });
-                        } else {
-                            setGameResult({ won: true, myScore: 0, opScore: 0, duration: 0 });
-                        }
+                    case "opponent_left":
+                        setLeftByOpponent(true);
                         setPhaseSync("game_over");
                         if (disconnectTimerRef.current) {
                             clearInterval(disconnectTimerRef.current);
@@ -623,6 +648,9 @@ function RoomGameScreen({
                 clearInterval(disconnectTimerRef.current);
             }
             if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+                if (phaseRef.current !== "game_over" && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "leave" }));
+                }
                 ws.close();
             }
         };
@@ -631,6 +659,10 @@ function RoomGameScreen({
 
     if (phase === "error") {
         return <ErrorScreen message={errorMessage || "Failed to connect to the game. The game may have ended or you may not have access."} />;
+    }
+
+    if (phase === "game_over" && leftByOpponent) {
+        return <GameLeftScreen opponentName={opponentName} />;
     }
 
     if (phase === "game_over" && gameResult) {
@@ -782,15 +814,33 @@ function RoomGameScreen({
             </div>
 
             {/* Controls hint */}
-            <div className="flex items-center gap-6 text-xs text-zinc-500">
-                <div className="flex items-center gap-1.5">
-                    <kbd className="rounded border border-white/10 bg-surface-lighter px-1.5 py-0.5 font-mono text-[10px]">W</kbd>
-                    <kbd className="rounded border border-white/10 bg-surface-lighter px-1.5 py-0.5 font-mono text-[10px]">S</kbd>
-                    <span>or</span>
-                    <kbd className="rounded border border-white/10 bg-surface-lighter px-1.5 py-0.5 font-mono text-[10px]">&uarr;</kbd>
-                    <kbd className="rounded border border-white/10 bg-surface-lighter px-1.5 py-0.5 font-mono text-[10px]">&darr;</kbd>
-                    <span style={{ color: myColor }}>Move</span>
+            <div className="flex w-full max-w-[800px] items-center justify-between">
+                <div className="flex items-center gap-6 text-xs text-zinc-500">
+                    <div className="flex items-center gap-1.5">
+                        <kbd className="rounded border border-white/10 bg-surface-lighter px-1.5 py-0.5 font-mono text-[10px]">W</kbd>
+                        <kbd className="rounded border border-white/10 bg-surface-lighter px-1.5 py-0.5 font-mono text-[10px]">S</kbd>
+                        <span>or</span>
+                        <kbd className="rounded border border-white/10 bg-surface-lighter px-1.5 py-0.5 font-mono text-[10px]">&uarr;</kbd>
+                        <kbd className="rounded border border-white/10 bg-surface-lighter px-1.5 py-0.5 font-mono text-[10px]">&darr;</kbd>
+                        <span style={{ color: myColor }}>Move</span>
+                    </div>
                 </div>
+
+                <button
+                    onClick={() => {
+                        // Mark as game_over BEFORE closing the socket so that
+                        // ws.onclose does not flash the Connection Error screen.
+                        setPhaseSync("game_over");
+                        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                            wsRef.current.send(JSON.stringify({ type: "leave" }));
+                            wsRef.current.close();
+                        }
+                        router.push("/dashboard/play");
+                    }}
+                    className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-1.5 text-xs font-semibold text-red-500 transition-colors hover:bg-red-500/20"
+                >
+                    Leave Match
+                </button>
             </div>
         </div>
     );

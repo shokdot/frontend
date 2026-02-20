@@ -128,6 +128,12 @@ export function getUserByUsername(username: string) {
 	);
 }
 
+export function getUserOnlineStatus(userId: string) {
+	return apiFetch<{ status: string; data: { status: string }; message: string }>(
+		`/api/v1/users/status/${encodeURIComponent(userId)}`,
+	);
+}
+
 export interface UpdateProfileData {
 	username?: string;
 	displayName?: string;
@@ -357,6 +363,29 @@ export function leaveRoom(roomId: string) {
 	return apiFetch<{ status: string; message: string }>(
 		`/api/v1/rooms/${encodeURIComponent(roomId)}/leave`,
 		{ method: "POST" },
+	);
+}
+
+/* ───────────── Invitations API ───────────── */
+
+export function createGameInvitation(inviteeId: string) {
+	return apiFetch<{ status: string; message: string; data: any }>("/api/v1/rooms/invitations", {
+		method: "POST",
+		body: JSON.stringify({ inviteeId }),
+	});
+}
+
+export function acceptGameInvitation(invitationId: string) {
+	return apiFetch<{ status: string; message: string; data: { roomId: string; gameId: string } }>(
+		`/api/v1/rooms/invitations/${encodeURIComponent(invitationId)}/accept`,
+		{ method: "POST" }
+	);
+}
+
+export function declineGameInvitation(invitationId: string) {
+	return apiFetch<{ status: string; message: string }>(
+		`/api/v1/rooms/invitations/${encodeURIComponent(invitationId)}/decline`,
+		{ method: "POST" }
 	);
 }
 

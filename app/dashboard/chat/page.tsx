@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useChat, type ChatMessage } from "../../components/ChatProvider";
 import { useLiveStatus, mapBackendStatus, type UserStatus } from "../../components/StatusProvider";
+import { useNotifications } from "../../components/NotificationProvider";
 import {
 	getConversations,
 	getConversationMessages,
 	deleteConversation,
 	getUserById,
+	getUserOnlineStatus,
 	getMyProfile,
 	searchUsers,
 	listFriends,
@@ -22,6 +24,7 @@ import {
 	type ApiConversation,
 	type ApiChatMessage,
 	type ApiUserProfile,
+	createGameInvitation,
 } from "@/lib/api";
 
 /* ──────────────────────── Icons ──────────────────────── */
@@ -736,27 +739,16 @@ export default function ChatPage() {
 	// Load conversation list
 	const loadConversations = useCallback(async () => {
 		try {
-			// Fetch conversations and friends statuses in parallel
-			const [convRes, friendsRes] = await Promise.all([
-				getConversations(),
-				listFriends("accepted").catch(() => null),
-			]);
-
-			// Build a map of userId → online status from friends list
-			const friendStatusMap = new Map<string, UserStatus>();
-			if (friendsRes) {
-				for (const f of friendsRes.data.friends) {
-					friendStatusMap.set(f.userId, mapBackendStatus(f.onlineStatus));
-				}
-			}
+			const convRes = await getConversations();
 
 			const convos: ConversationDisplay[] = [];
 
 			for (const c of convRes.data) {
-				// Skip conversations that only have GAME_INVITE messages (no actual chat)
-				if (c.lastMessageType === "GAME_INVITE" && !c.lastMessage) continue;
-
-				const profile = await fetchProfile(c.partnerId);
+				// Fetch profile and status in parallel for each partner
+				const [profile, statusRes] = await Promise.all([
+					fetchProfile(c.partnerId),
+					getUserOnlineStatus(c.partnerId).catch(() => null),
+				]);
 				const name = profile?.displayName || profile?.username || c.partnerId.slice(0, 8);
 				convos.push({
 					partnerId: c.partnerId,
@@ -764,7 +756,7 @@ export default function ChatPage() {
 					username: profile?.username || c.partnerId.slice(0, 8),
 					avatar: getInitials(name),
 					avatarUrl: profile?.avatarUrl ?? null,
-					status: friendStatusMap.get(c.partnerId) ?? "offline",
+					status: statusRes ? mapBackendStatus(statusRes.data.status) : "offline",
 					lastMessage: c.lastMessageType === "GAME_INVITE" ? "Game Invite" : c.lastMessage,
 					lastTime: formatTime(c.lastMessageAt),
 					unreadCount: 0,
@@ -1253,6 +1245,7 @@ function ChatArea({
 	onUnblock: (username: string, partnerId: string) => Promise<void>;
 	onDeleteConversation: (partnerId: string) => void;
 }) {
+	const { addToast } = useNotifications();
 	const liveStatus = useLiveStatus(conversation.partnerId, conversation.status);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1376,7 +1369,19 @@ function ChatArea({
 		}
 	}
 
-	// Reset when conversation changes
+	async function handleInviteToGame() {
+		try {
+			await createGameInvitation(conversation.partnerId);
+			addToast({ type: "success", title: "Game invite sent!" });
+		} catch (err: any) {
+			let title = "Failed to send game invite";
+			const msg = err?.message;
+			if (msg === "INVITER_ALREADY_IN_ROOM") title = "You are already in a game/room";
+			else if (msg === "INVITEE_ALREADY_IN_ROOM") title = "Player is already in a game/room";
+			addToast({ type: "error", title });
+		}
+	}
+
 	useEffect(() => {
 		inputRef.current?.focus();
 		hasScrolledRef.current = false;
@@ -1443,8 +1448,12 @@ function ChatArea({
 
 				{/* Actions */}
 				<div className="flex items-center gap-1">
-					{!isBlocked && liveStatus === "online" && (
-						<button className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-neon-cyan" title="Invite to game">
+					{!isBlocked && (
+						<button
+							onClick={handleInviteToGame}
+							className="rounded-lg p-2 text-zinc-400 transition-colors hover:bg-white/5 hover:text-neon-cyan"
+							title="Invite to game"
+						>
 							<GamepadIcon className="h-4 w-4" />
 						</button>
 					)}

@@ -14,8 +14,10 @@ import {
 	type ApiUserProfile,
 	type ApiPlayerStats,
 	type ApiPlayerRank,
+	createGameInvitation,
 } from "@/lib/api";
 import { useStatusMap, mapBackendStatus, type UserStatus } from "../components/StatusProvider";
+import { useNotifications } from "../components/NotificationProvider";
 
 /* ──────────────────────── Icons ──────────────────────── */
 
@@ -270,6 +272,8 @@ interface FriendData {
 }
 
 function FriendRow({ friend }: { friend: FriendData }) {
+	const { addToast } = useNotifications();
+
 	const statusColors: Record<OnlineStatus, string> = {
 		online: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]",
 		"in-game": "bg-neon-cyan shadow-[0_0_6px_rgba(0,240,255,0.8)]",
@@ -281,6 +285,20 @@ function FriendRow({ friend }: { friend: FriendData }) {
 		"in-game": "In Game",
 		idle: "Idle",
 	};
+
+	async function handleInviteToGame(e: React.MouseEvent) {
+		e.preventDefault();
+		try {
+			await createGameInvitation(friend.userId);
+			addToast({ type: "success", title: "Game invite sent!" });
+		} catch (err: any) {
+			let title = "Failed to send game invite";
+			const msg = err?.message;
+			if (msg === "INVITER_ALREADY_IN_ROOM") title = "You are already in a game/room";
+			else if (msg === "INVITEE_ALREADY_IN_ROOM") title = "Player is already in a game/room";
+			addToast({ type: "error", title });
+		}
+	}
 
 	return (
 		<Link
@@ -311,9 +329,9 @@ function FriendRow({ friend }: { friend: FriendData }) {
 
 			{/* Challenge button */}
 			{friend.status === "online" && (
-				<span className="rounded-md bg-accent/10 px-2 py-1 text-xs font-medium text-accent-light transition-colors hover:bg-accent/20">
+				<button onClick={handleInviteToGame} className="rounded-md bg-accent/10 px-2 py-1 text-xs font-medium text-accent-light transition-colors hover:bg-accent/20">
 					Invite
-				</span>
+				</button>
 			)}
 		</Link>
 	);

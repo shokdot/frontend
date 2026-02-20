@@ -7,6 +7,7 @@ import {
 	useEffect,
 	useRef,
 	useState,
+	ReactNode,
 } from "react";
 
 /* ──────────────────────── Types ──────────────────────── */
@@ -19,11 +20,12 @@ export interface Toast {
 	title: string;
 	message?: string;
 	duration?: number; // ms, 0 = sticky
+	action?: ReactNode;
 }
 
 interface NotificationContextValue {
 	toasts: Toast[];
-	addToast: (toast: Omit<Toast, "id">) => string;
+	addToast: (toast: Omit<Toast, "id"> & { id?: string }) => string;
 	removeToast: (id: string) => void;
 }
 
@@ -182,8 +184,8 @@ function ToastItem({
 	return (
 		<div
 			className={`pointer-events-auto relative w-80 overflow-hidden rounded-xl border bg-surface-light backdrop-blur-xl transition-all duration-300 sm:w-96 ${style.border} ${style.glow} ${visible && !exiting
-					? "translate-x-0 opacity-100"
-					: "translate-x-8 opacity-0"
+				? "translate-x-0 opacity-100"
+				: "translate-x-8 opacity-0"
 				}`}
 		>
 			<div className="flex gap-3 p-4">
@@ -192,6 +194,11 @@ function ToastItem({
 					<p className="text-sm font-semibold text-white">{toast.title}</p>
 					{toast.message && (
 						<p className="mt-0.5 text-sm text-zinc-400">{toast.message}</p>
+					)}
+					{toast.action && (
+						<div className="mt-3 flex items-center gap-2">
+							{toast.action}
+						</div>
 					)}
 				</div>
 				<button
@@ -222,12 +229,12 @@ function ToastItem({
 export default function NotificationProvider({
 	children,
 }: {
-	children: React.ReactNode;
+	children: ReactNode;
 }) {
 	const [toasts, setToasts] = useState<Toast[]>([]);
 
-	const addToast = useCallback((toast: Omit<Toast, "id">) => {
-		const id = crypto.randomUUID();
+	const addToast = useCallback((toast: Omit<Toast, "id"> & { id?: string }) => {
+		const id = toast.id ?? crypto.randomUUID();
 		setToasts((prev) => [...prev, { ...toast, id }]);
 		return id;
 	}, []);
