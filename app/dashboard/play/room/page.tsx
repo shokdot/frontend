@@ -494,11 +494,14 @@ function RoomGameScreen({
             })
             .catch(() => { });
 
+        let cancelled = false;
+
         const wsUrl = buildWsUrl(`/api/v1/games/ws/${roomId}`, token);
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
+            if (cancelled) { ws.close(); return; }
             setPhaseSync("waiting");
         };
 
@@ -644,14 +647,17 @@ function RoomGameScreen({
         };
 
         return () => {
+            cancelled = true;
             if (disconnectTimerRef.current) {
                 clearInterval(disconnectTimerRef.current);
             }
-            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-                if (phaseRef.current !== "game_over" && ws.readyState === WebSocket.OPEN) {
+            if (ws.readyState === WebSocket.OPEN) {
+                if (phaseRef.current !== "game_over") {
                     ws.send(JSON.stringify({ type: "leave" }));
                 }
                 ws.close();
+            } else if (ws.readyState === WebSocket.CONNECTING) {
+                // Let the socket finish opening, then close it in onopen (cancelled flag)
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
