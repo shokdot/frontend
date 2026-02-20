@@ -25,7 +25,7 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="en" className={inter.variable} data-theme="dark" suppressHydrationWarning>
+		<html lang="en" className={inter.variable} data-theme="dark" data-scroll-behavior="smooth" suppressHydrationWarning>
 			<body className="min-h-dvh" suppressHydrationWarning>
 				<ThemeProvider>
 					<NotificationProvider>{children}</NotificationProvider>
